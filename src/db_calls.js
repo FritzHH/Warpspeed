@@ -236,7 +236,12 @@ export async function firestoreUpdate(path, data) {
  */
 export async function firestoreDelete(path) {
   const docRef = doc(DB, ...path.split("/"));
-  await deleteDoc(docRef);
+  try {
+    await deleteDoc(docRef);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }
 
 /**
@@ -769,6 +774,8 @@ export async function callCloudFunction(functionName, data) {
 // Create callable functions
 const sendSMSCallable = httpsCallable(functions, "sendSMS");
 const sendSMSEnhancedCallable = httpsCallable(functions, "sendSMSEnhanced");
+const roadCallInitiateCallable = httpsCallable(functions, "roadCallInitiate");
+const roadCallCancelCallable = httpsCallable(functions, "roadCallCancel");
 const sendEmailCallable = httpsCallable(functions, "sendEmailCallable");
 const uploadPDFAndSendSMSCallableRef = httpsCallable(functions, "uploadPDFAndSendSMSCallable");
 const generateReceiptPDFCallableRef = httpsCallable(functions, "generateReceiptPDFCallable");
@@ -1011,6 +1018,32 @@ export function uploadPDFAndSendSMS(data) {
       return {
         success: false,
         error: error.message || "Failed to upload PDF and send SMS",
+        code: error.code || "UNKNOWN_ERROR",
+      };
+    });
+}
+
+export function roadCallInitiate(data) {
+  return roadCallInitiateCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error in roadCallInitiate", error);
+      return {
+        success: false,
+        error: error.message || "Failed to initiate road call",
+        code: error.code || "UNKNOWN_ERROR",
+      };
+    });
+}
+
+export function roadCallCancel(data) {
+  return roadCallCancelCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error in roadCallCancel", error);
+      return {
+        success: false,
+        error: error.message || "Failed to cancel road call",
         code: error.code || "UNKNOWN_ERROR",
       };
     });

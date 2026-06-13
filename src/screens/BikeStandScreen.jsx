@@ -44,10 +44,10 @@ import {
   DropdownMenu,
   AlertBox,
   AutoJumpBlocker,
+  PanelConfirm,
 } from "../dom_components";
 import { useAutoJumpBlock } from "../hooks/useAutoJumpBlock";
 import { activeInputStyle } from "../shared/activeInputStyle";
-import { confirmAddHint } from "../shared/confirmAddHint";
 import {
   dbListenToSettings,
   dbListenToInventory,
@@ -351,6 +351,33 @@ export function BikeStandScreen() {
   const zBikeInfoModal = useZ("modal", sShowBikeInfoModal);
   const zFooterMenu = useZ("dropdown", sShowFooterMenu);
   const autoJumpBlock = useAutoJumpBlock();
+  const [sHintConfirm, _setHintConfirm] = useState(null);
+
+  function promptAddHint({ kind, value, settingsKey }) {
+    if (!value || typeof value !== "string") return;
+    const trimmed = value.trim();
+    if (trimmed.length < 3) return;
+    const existing = (zSettings && zSettings[settingsKey]) || [];
+    if (existing.some((v) => v.toLowerCase() === trimmed.toLowerCase())) return;
+    const kindLabel = kind === "brand" ? "brand" : "description";
+    const listLabel = settingsKey === "allBrands" ? "brands" : "descriptions";
+    _setHintConfirm({
+      title: `Add ${kindLabel}?`,
+      message: `Add "${trimmed}" to the saved ${listLabel}?`,
+      onYes: () => {
+        const current = useSettingsStore.getState().settings?.[settingsKey] || [];
+        if (!current.some((v) => v.toLowerCase() === trimmed.toLowerCase())) {
+          const updated = [...current, trimmed].sort((a, b) =>
+            a.toLowerCase().localeCompare(b.toLowerCase())
+          );
+          useSettingsStore.getState().setField(settingsKey, updated);
+        }
+        _setHintConfirm(null);
+      },
+      onNo: () => _setHintConfirm(null),
+    });
+  }
+
   const inactivityTimerRef = useRef(null);
 
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000;
@@ -889,11 +916,11 @@ export function BikeStandScreen() {
   }
 
   function saveBrandToAllBrands(brand) {
-    confirmAddHint({ kind: "brand", value: brand, settingsKey: "allBrands" });
+    promptAddHint({ kind: "brand", value: brand, settingsKey: "allBrands" });
   }
 
   function saveDescToAllDescriptions(desc) {
-    confirmAddHint({ kind: "description", value: desc, settingsKey: "allDescriptions" });
+    promptAddHint({ kind: "description", value: desc, settingsKey: "allDescriptions" });
   }
 
   const allColorLabels = COLORS.map((c) => c.label);
@@ -1474,17 +1501,17 @@ export function BikeStandScreen() {
                   onSelect={handleStatusSelect}
                   buttonStyle={{
                     backgroundColor: rs.backgroundColor,
-                    paddingTop: 15,
-                    paddingBottom: 15,
-                    paddingLeft: 18,
-                    paddingRight: 18,
-                    borderRadius: Radius.container,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    paddingLeft: 28,
+                    paddingRight: 28,
+                    borderRadius: 25,
                     height: "auto",
                   }}
                   buttonTextStyle={{
                     color: rs.textColor,
                     fontWeight: "normal",
-                    fontSize: 27,
+                    fontSize: 26,
                   }}
                   modalCoordY={45}
                   buttonText={rs.label}
@@ -1492,19 +1519,6 @@ export function BikeStandScreen() {
                   itemTextStyle={{ fontSize: 23 }}
                 />
                 <div style={{ display: "flex", flexDirection: "row", gap: 15 }}>
-                <StandTouch
-                  className={styles.bmCancelBtn}
-                  style={{ backgroundColor: C.green }}
-                  touchStart={false}
-                  onPress={() => {
-                    saveDetailOnLeave(sDetailField);
-                    _setShowBikeInfoModal(false);
-                    _setDetailField(null);
-                  }}
-                >
-                  <Image icon={ICONS.close1} size={24} />
-                  <span className={styles.bmCancelText} style={{ color: C.textWhite }}>Close</span>
-                </StandTouch>
                 <StandTouch
                   className={styles.bmCancelBtn}
                   style={{ backgroundColor: C.orange, opacity: selectedDeleteGuard.canDelete ? 1 : 0.3, cursor: selectedDeleteGuard.canDelete ? "pointer" : "not-allowed" }}
@@ -1542,6 +1556,19 @@ export function BikeStandScreen() {
                 >
                   <Image icon={ICONS.trash} size={24} />
                   <span className={styles.bmCancelText} style={{ color: C.textWhite }}>Delete WO</span>
+                </StandTouch>
+                <StandTouch
+                  className={styles.bmCancelBtn}
+                  style={{ backgroundColor: C.green }}
+                  touchStart={false}
+                  onPress={() => {
+                    saveDetailOnLeave(sDetailField);
+                    _setShowBikeInfoModal(false);
+                    _setDetailField(null);
+                  }}
+                >
+                  <Image icon={ICONS.close1} size={24} />
+                  <span className={styles.bmCancelText} style={{ color: C.textWhite }}>Close</span>
                 </StandTouch>
                 </div>
               </div>
@@ -1910,45 +1937,6 @@ export function BikeStandScreen() {
                         />
                       </div>
                     </StandTouch>
-                    <StandTouch
-                      style={{ marginLeft: 10, opacity: (!selectedWorkorder?.waitTime?.maxWaitTimeDays || Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) <= 1) ? 0.3 : 1 }}
-                      onPress={() => {
-                        let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
-                        if (current <= 1) return;
-                        let newDays = current - 1;
-                        let woID = selectedWorkorder.id;
-                        let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
-                        let match = allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - newDays) < Math.abs(best.maxWaitTimeDays - newDays)) ? w : best, null);
-                        let waitObj = match ? { ...match, maxWaitTimeDays: newDays } : { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: newDays };
-                        useOpenWorkordersStore.getState().setField("waitTime", waitObj, woID, false);
-                        clearTimeout(waitDaysDebounceRef.current);
-                        waitDaysDebounceRef.current = setTimeout(() => {
-                          let wo = useOpenWorkordersStore.getState().getWorkorders().find((w) => w.id === woID);
-                          if (wo) useOpenWorkordersStore.getState().setField("waitTime", wo.waitTime, woID, true);
-                        }, 500);
-                      }}
-                    >
-                      <Image icon={ICONS.minus} size={36} />
-                    </StandTouch>
-                    <StandTouch
-                      style={{ marginLeft: 6 }}
-                      onPress={() => {
-                        let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
-                        let newDays = current + 1;
-                        let woID = selectedWorkorder.id;
-                        let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
-                        let match = allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - newDays) < Math.abs(best.maxWaitTimeDays - newDays)) ? w : best, null);
-                        let waitObj = match ? { ...match, maxWaitTimeDays: newDays } : { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: newDays };
-                        useOpenWorkordersStore.getState().setField("waitTime", waitObj, woID, false);
-                        clearTimeout(waitDaysDebounceRef.current);
-                        waitDaysDebounceRef.current = setTimeout(() => {
-                          let wo = useOpenWorkordersStore.getState().getWorkorders().find((w) => w.id === woID);
-                          if (wo) useOpenWorkordersStore.getState().setField("waitTime", wo.waitTime, woID, true);
-                        }, 500);
-                      }}
-                    >
-                      <Image icon={ICONS.add} size={36} />
-                    </StandTouch>
                   </div>
                   <div className={styles.bmWaitDropdownSlot}>
                     <DropdownMenu
@@ -1960,28 +1948,24 @@ export function BikeStandScreen() {
                         let waitObj = { ...item, removable: !isNonRemovable };
                         useOpenWorkordersStore.getState().setField("waitTime", waitObj, selectedWorkorder.id);
                       }}
-                      buttonStyle={{ opacity: selectedWorkorder?.waitTime?.label ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
-                      buttonTextStyle={{ fontSize: 28 }}
+                      buttonStyle={{
+                        opacity: selectedWorkorder?.waitTime?.label ? DROPDOWN_SELECTED_OPACITY : 1,
+                        paddingVertical: 12,
+                        backgroundColor: selectedWorkorder?.waitTime?.label ? undefined : C.danger,
+                      }}
+                      buttonTextStyle={{
+                        fontSize: 28,
+                        color: selectedWorkorder?.waitTime?.label ? undefined : C.textWhite,
+                      }}
                       itemTextStyle={{ fontSize: 32 }}
                       itemStyle={{ paddingVertical: 28, height: "auto" }}
-                      buttonText="Wait Times"
+                      buttonText={selectedWorkorder?.waitTime?.label || "Wait Times"}
                       centerMenuVertically={true}
                       centerOnClickX={true}
                       menuMaxHeight={window.innerHeight - 20}
                     />
                   </div>
                 </div>
-
-                {/* Wait estimate label */}
-                {(() => {
-                  let estimateLabel = calculateWaitEstimateLabel(selectedWorkorder, zSettings);
-                  let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
-                  return estimateLabel ? (
-                    <span className={styles.bmWaitEstimate} style={{ color: isMissing ? C.red : C.textMuted, display: "block" }}>
-                      {estimateLabel}
-                    </span>
-                  ) : null;
-                })()}
 
               </div>
 
@@ -2020,6 +2004,14 @@ export function BikeStandScreen() {
               })()}
             </div>
             <AutoJumpBlocker show={autoJumpBlock.blocking} message={autoJumpBlock.message} />
+            <PanelConfirm
+              show={!!sHintConfirm}
+              size="large"
+              title={sHintConfirm?.title}
+              message={sHintConfirm?.message}
+              onYes={sHintConfirm?.onYes}
+              onNo={sHintConfirm?.onNo}
+            />
           </div>
         );
       })()}
@@ -2256,16 +2248,17 @@ export function BikeStandScreen() {
                       onSelect={handleStatusSelect}
                       buttonStyle={{
                         backgroundColor: rs.backgroundColor,
-                        paddingTop: 5,
-                        paddingBottom: 5,
-                        paddingLeft: 18,
-                        paddingRight: 18,
+                        paddingTop: 10,
+                        paddingBottom: 10,
+                        paddingLeft: 28,
+                        paddingRight: 28,
+                        borderRadius: 25,
                         height: "auto",
                       }}
                       buttonTextStyle={{
                         color: rs.textColor,
                         fontWeight: "normal",
-                        fontSize: 27,
+                        fontSize: 26,
                       }}
                       modalCoordY={45}
                       buttonText={rs.label}
@@ -2808,9 +2801,18 @@ export function BikeStandScreen() {
               {hasWorkorderReady && (
                 <div className={styles.standSidebarFooter} style={{ borderTopColor: C.borderSubtle }}>
                   <div className={styles.standSidebarFooterRow}>
-                    {/* Print button — opens unified print modal */}
+                    {/* Print button — prints workorder to selected printer; opens picker if none selected */}
                     {selectedWorkorder && (
-                      <StandTouch onPress={() => _setShowPrinterSelectModal(true)} className={styles.standFooterIconBtn}>
+                      <StandTouch
+                        onPress={() => {
+                          if (sSelectedPrinterID && !selectedPrinterOffline) {
+                            handleWorkorderPrint();
+                          } else {
+                            _setShowPrinterSelectModal(true);
+                          }
+                        }}
+                        className={styles.standFooterIconBtn}
+                      >
                         <Image icon={selectedPrinterOffline ? warningIcon : ICONS.print} size={48} />
                       </StandTouch>
                     )}
@@ -2850,6 +2852,14 @@ export function BikeStandScreen() {
                         >
                           <Image icon={ICONS.editPencil} size={36} />
                           <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Edit Sizing</span>
+                        </StandTouch>
+                        <StandTouch
+                          onPress={() => { _setShowFooterMenu(false); _setShowPrinterSelectModal(true); }}
+                          className={styles.standFooterMenuItem}
+                          style={{ borderBottomColor: C.borderSubtle }}
+                        >
+                          <Image icon={ICONS.print} size={36} />
+                          <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Printer Settings</span>
                         </StandTouch>
                         <StandTouch
                           onPress={() => { _setShowFooterMenu(false); _setShowStandSettings(true); }}

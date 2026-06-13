@@ -51,6 +51,24 @@ export function useGatedInput({ level } = {}) {
 }
 
 /**
+ * useGatedPanel — returns { onPointerDownCapture } to spread on a panel root.
+ * Intercepts ANY pointerdown inside the panel when the session is invalid,
+ * prompts for login, and consumes the event. After PIN succeeds, the user
+ * re-clicks to act. Subsequent clicks pass through until the session expires.
+ */
+export function useGatedPanel({ level } = {}) {
+  return {
+    onPointerDownCapture: (e) => {
+      const store = useLoginStore.getState();
+      if (store.isSessionValid({ level })) return;
+      e.stopPropagation();
+      e.preventDefault();
+      store.promptLogin({ level });
+    },
+  };
+}
+
+/**
  * useGatedAction — wraps an action function so it only runs after a valid
  * session (optionally at `level` or higher). Forwards args to the action.
  */

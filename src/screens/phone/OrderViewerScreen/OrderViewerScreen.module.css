@@ -5,92 +5,23 @@
   flex-direction: column;
   background-color: var(--surface-alt);
   box-sizing: border-box;
+  position: relative;
 }
 
-.header {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border-default);
-  background-color: var(--surface-accent-muted);
-  flex-shrink: 0;
-  box-sizing: border-box;
-  gap: 12px;
-}
-
-.backButton {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  border: none;
-  background-color: transparent;
-  font-size: 22px;
-  color: var(--text-default);
-  cursor: pointer;
-}
-
-.title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-default);
-  flex: 1;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.setActiveBtn {
-  flex-shrink: 0;
+.setActiveFab {
+  position: absolute;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  right: 20px;
+  z-index: 5;
   border: 1px solid var(--accent);
   background-color: var(--accent);
   color: var(--text-on-accent);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: var(--radius-control);
-  cursor: pointer;
-}
-
-.activeTag {
-  flex-shrink: 0;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--danger);
-  padding: 6px 12px;
-}
-
-.toggleBar {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px 12px;
-  background-color: var(--surface-base);
-  border-bottom: 1px solid var(--border-default);
-  flex-shrink: 0;
-  box-sizing: border-box;
-}
-
-.toggleChip {
-  border: 1px solid var(--border-default);
-  background-color: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 10px;
+  padding: 12px 18px;
   border-radius: var(--radius-pill);
   cursor: pointer;
-  flex-shrink: 0;
-}
-
-.toggleChipOn {
-  border-color: var(--accent);
-  background-color: var(--accent);
-  color: var(--text-on-accent);
+  box-shadow: 0 4px 12px var(--shadow-color-default);
 }
 
 .list {
@@ -142,38 +73,6 @@
   flex-shrink: 0;
 }
 
-.itemDetails {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.detailChip {
-  display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 4px;
-  padding: 3px 8px;
-  background-color: var(--surface-base);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-pill);
-}
-
-.detailLabel {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-}
-
-.detailValue {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-default);
-}
-
 .emptyState {
   display: flex;
   flex-direction: column;
@@ -185,4 +84,24 @@
   font-size: 14px;
   color: var(--text-muted);
   text-align: center;
+}
+
+.scanBtn {
+  flex-shrink: 0;
+  width: calc(100% - 24px);
+  margin: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  padding: 16px 14px;
+  border: none;
+  background-color: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.scanBtn:active {
+  background-color: var(--accent-hover);
 }

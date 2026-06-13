@@ -724,6 +724,24 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
           className={styles.radixContent}
           style={{ zIndex: z + 1 }}
           onOpenAutoFocus={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => {
+            const t = e.target;
+            if (t && typeof t.closest === "function" && (t.closest("[data-dropdown-menu-portal]") || t.closest("[data-alert-portal]"))) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            const t = e.target;
+            if (t && typeof t.closest === "function" && (t.closest("[data-dropdown-menu-portal]") || t.closest("[data-alert-portal]"))) {
+              e.preventDefault();
+            }
+          }}
+          onFocusOutside={(e) => {
+            const t = e.target;
+            if (t && typeof t.closest === "function" && (t.closest("[data-dropdown-menu-portal]") || t.closest("[data-alert-portal]"))) {
+              e.preventDefault();
+            }
+          }}
           aria-label="Payroll"
         >
           <DialogPrimitive.Title className={styles.srOnly}>Payroll</DialogPrimitive.Title>
@@ -1307,7 +1325,7 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                           }}
                           className={styles.iconBtn}
                         >
-                          <Image icon={ICONS.redx} size={18} />
+                          <Image icon={ICONS.redx} size={21} />
                         </TouchableOpacity>
                       </Tooltip>
                       <Tooltip text="Save changes" position="left">
@@ -1331,7 +1349,7 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                           }}
                           className={`${styles.iconBtn} ${styles.iconBtnLeft}`}
                         >
-                          <Image icon={ICONS.check} size={18} />
+                          <Image icon={ICONS.check} size={21} />
                         </TouchableOpacity>
                       </Tooltip>
                       <Tooltip text="Delete entry" position="left">
@@ -1356,7 +1374,7 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                           }}
                           className={`${styles.iconBtn} ${styles.iconBtnLeft}`}
                         >
-                          <Image icon={ICONS.trash} size={16} />
+                          <Image icon={ICONS.trash} size={19} />
                         </TouchableOpacity>
                       </Tooltip>
                     </>

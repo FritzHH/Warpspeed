@@ -22,6 +22,8 @@ export { Tooltip } from "./Tooltip/Tooltip";
 export { AlertBox } from "./AlertBox/AlertBox";
 export { Toast } from "./Toast/Toast";
 export { AutoJumpBlocker } from "./AutoJumpBlocker/AutoJumpBlocker";
+export { PanelJumpBlocker } from "./AutoJumpBlocker/PanelJumpBlocker";
+export { PanelConfirm } from "./PanelConfirm/PanelConfirm";
 export { ModalFooter, ModalFooterButton } from "./ModalFooter/ModalFooter";
 export { ModalHeader, ModalHeaderButton } from "./ModalHeader/ModalHeader";
 export { LargeModalHeader, LargeModalHeaderButton } from "./LargeModalHeader/LargeModalHeader";
@@ -43,6 +45,7 @@ export { FullSaleModal } from "./FullSaleModal/FullSaleModal";
 export { WebPageModal } from "./WebPageModal/WebPageModal";
 export { NoteHelper } from "./NoteHelper/NoteHelper";
 export { LineActionsDropdown } from "./LineActionsDropdown/LineActionsDropdown";
+export { LineItemActionRow } from "./LineItemActionRow/LineItemActionRow";
 export { CustomerQuickNotes } from "./CustomerQuickNotes/CustomerQuickNotes";
 
 // Batch 6 - Animated components
@@ -51,3 +54,4 @@ export { StaleBanner } from "./StaleBanner/StaleBanner";
 export { ReceiptSentOverlay } from "./ReceiptSentOverlay/ReceiptSentOverlay";
 export { SuperUserBanner } from "./SuperUserBanner/SuperUserBanner";
 export { BillingSuspensionBanner } from "./BillingSuspensionBanner/BillingSuspensionBanner";
+export { SwipeBackHint } from "./SwipeBackHint/SwipeBackHint";

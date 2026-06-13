@@ -4,17 +4,20 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import cloneDeep from "lodash/cloneDeep";
 import { ROUTES } from "../../../routes";
-import { useLoginStore } from "../../../stores";
+import { useLoginStore, useInventoryStore } from "../../../stores";
 import {
   dbSaveVendorOrderItem,
   dbUpdateVendorOrderItemFields,
+  dbDeleteVendorOrderItem,
   dbResolveOrderItem,
   dbUpdateVendorOrderFields,
+  dbListenToVendorOrderItems,
 } from "../../../db_calls_wrapper";
 import { VENDOR_ORDER_ITEM_PROTO } from "../../../data";
 import { generate36CharUUID } from "../../../utils";
 import { ICONS } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
+import { SwipeBackHint, Toast } from "../../../dom_components";
 import styles from "./OrderingScreen.module.css";
 
 const SCAN_FORMATS = [
@@ -45,6 +48,47 @@ export function OrderingScreen() {
   const [sItemCount, _setItemCount] = useState(0);
   const [sScannedItem, _setScannedItem] = useState(null);
   const [sCameraError, _setCameraError] = useState("");
+  const [sShowOrderPanel, _setShowOrderPanel] = useState(false);
+  const [sCatalogChecking, _setCatalogChecking] = useState(false);
+
+  const [sSwipeX, _setSwipeX] = useState(0);
+  const [sSwiping, _setSwiping] = useState(false);
+  const swipeStartRef = useRef(null);
+
+  function handleSwipeStart(e) {
+    const t = e.touches[0];
+    if (t.clientX > 30) return;
+    swipeStartRef.current = { x: t.clientX, time: Date.now() };
+    _setSwiping(true);
+  }
+  function handleSwipeMove(e) {
+    if (!swipeStartRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeStartRef.current.x;
+    if (dx > 0) _setSwipeX(dx);
+  }
+  function handleSwipeEnd() {
+    if (!swipeStartRef.current) return;
+    const elapsed = Date.now() - swipeStartRef.current.time;
+    const velocity = sSwipeX / Math.max(elapsed, 1);
+    const commitThreshold = window.innerWidth * 0.3;
+    const isCommit = sSwipeX > commitThreshold || velocity > 0.5;
+    swipeStartRef.current = null;
+    _setSwiping(false);
+    if (isCommit) {
+      _setSwipeX(window.innerWidth);
+      setTimeout(() => {
+        navigate(ROUTES.phoneOrdering + "?switch=1");
+        _setSwipeX(0);
+      }, 200);
+    } else {
+      _setSwipeX(0);
+    }
+  }
+  const swipeStyle = {
+    transform: `translateX(${sSwipeX}px)`,
+    transition: sSwiping ? "none" : "transform 200ms ease",
+  };
 
   const userIDRef = useRef(userID);
   useEffect(() => {
@@ -72,21 +116,41 @@ export function OrderingScreen() {
       lookupStatus: "pending",
     };
 
-    _setScannedItem({ ...newItem, displayName: "", resolved: false });
-
     dbUpdateVendorOrderFields(orderID, {
       lastModifiedMillis: now,
       lastModifiedByUserID: uid,
     });
 
-    dbSaveVendorOrderItem(orderID, newItem).then(() => {
-      dbResolveOrderItem(orderID, newItem).then((res) => {
-        _setScannedItem((cur) =>
-          cur && cur.id === itemID
-            ? { ...cur, displayName: res?.displayName || "", resolved: true }
-            : cur,
-        );
+    // Synchronous local-inventory check picks the UX path before any await:
+    // local hit → open qty modal immediately; local miss → show "checking
+    // catalog" toast while the resolver queries vendor catalogs.
+    const inventory =
+      useInventoryStore.getState().getInventoryArr?.() || [];
+    const localMatch = inventory.find((inv) => {
+      if (!inv) return false;
+      if (inv.primaryBarcode === code) return true;
+      const codes = Array.isArray(inv.barcodes) ? inv.barcodes : [];
+      return codes.includes(code);
+    });
+
+    if (localMatch) {
+      const localDisplay =
+        localMatch.catalogName || localMatch.formalName || "";
+      _setScannedItem({ ...newItem, displayName: localDisplay, resolved: true });
+      dbSaveVendorOrderItem(orderID, newItem).then(() => {
+        dbResolveOrderItem(orderID, newItem);
       });
+      return;
+    }
+
+    _setCatalogChecking(true);
+    await dbSaveVendorOrderItem(orderID, newItem);
+    const res = await dbResolveOrderItem(orderID, newItem);
+    _setCatalogChecking(false);
+    _setScannedItem({
+      ...newItem,
+      displayName: res?.displayName || "",
+      resolved: true,
     });
   }
 
@@ -166,23 +230,28 @@ export function OrderingScreen() {
     }
   }
 
+  async function handleQtyDismiss() {
+    const item = sScannedItem;
+    _setScannedItem(null);
+    modalOpenRef.current = false;
+    if (!item || !orderID) return;
+    lastScanRef.current = { code: item.scannedBarcode, millis: Date.now() };
+    try {
+      await dbDeleteVendorOrderItem(orderID, item.id);
+    } catch {
+      // ignore; modal was already dismissed locally
+    }
+  }
+
   return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <button
-          className={styles.backButton}
-          onClick={() => navigate(ROUTES.phone)}
-        >
-          ←
-        </button>
-        <button
-          className={styles.switchButton}
-          onClick={() => navigate(ROUTES.phoneOrdering + "?switch=1")}
-        >
-          Switch
-        </button>
-        <span className={styles.count}>{sItemCount} items</span>
-      </div>
+    <div
+      className={styles.root}
+      onTouchStart={handleSwipeStart}
+      onTouchMove={handleSwipeMove}
+      onTouchEnd={handleSwipeEnd}
+      style={swipeStyle}
+    >
+      <SwipeBackHint label="Open Orders" swipeX={sSwipeX} />
       <div className={styles.body}>
         <video
           ref={videoRef}
@@ -203,13 +272,124 @@ export function OrderingScreen() {
           scannedBarcode={sScannedItem.scannedBarcode}
           resolved={sScannedItem.resolved}
           onSubmit={handleQtySubmit}
+          onDismiss={handleQtyDismiss}
+        />
+      )}
+      <Toast
+        text="Not in inventory · checking catalog…"
+        visible={sCatalogChecking}
+        duration={0}
+        position="mid-top-middle"
+      />
+      {sShowOrderPanel && (
+        <OrderPanelModal
+          orderID={orderID}
+          onClose={() => _setShowOrderPanel(false)}
         />
       )}
     </div>
   );
 }
 
-function QtyModal({ itemName, scannedBarcode, resolved, onSubmit }) {
+function OrderPanelModal({ orderID, onClose }) {
+  const z = useZ("modal");
+  const [sItems, _setItems] = useState([]);
+  const [sSwipeX, _setSwipeX] = useState(0);
+  const [sSwiping, _setSwiping] = useState(false);
+  const swipeStartRef = useRef(null);
+
+  useEffect(() => {
+    if (!orderID) return;
+    const unsub = dbListenToVendorOrderItems(orderID, (data) => {
+      _setItems(Array.isArray(data) ? data : []);
+    });
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
+  }, [orderID]);
+
+  const swipeHandlers = {
+    onTouchStart: (e) => {
+      const t = e.touches[0];
+      if (t.clientX > 30) return;
+      e.stopPropagation();
+      swipeStartRef.current = { x: t.clientX, time: Date.now() };
+      _setSwiping(true);
+    },
+    onTouchMove: (e) => {
+      if (!swipeStartRef.current) return;
+      e.stopPropagation();
+      const t = e.touches[0];
+      const dx = t.clientX - swipeStartRef.current.x;
+      if (dx > 0) _setSwipeX(dx);
+    },
+    onTouchEnd: (e) => {
+      if (!swipeStartRef.current) return;
+      e.stopPropagation();
+      const elapsed = Date.now() - swipeStartRef.current.time;
+      const velocity = sSwipeX / Math.max(elapsed, 1);
+      const commitThreshold = window.innerWidth * 0.3;
+      const isCommit = sSwipeX > commitThreshold || velocity > 0.5;
+      swipeStartRef.current = null;
+      _setSwiping(false);
+      if (isCommit) {
+        _setSwipeX(window.innerWidth);
+        setTimeout(() => { onClose(); _setSwipeX(0); }, 200);
+      } else {
+        _setSwipeX(0);
+      }
+    },
+  };
+
+  const swipeStyle = {
+    transform: `translateX(${sSwipeX}px)`,
+    transition: sSwiping ? "none" : "transform 200ms ease",
+  };
+
+  return (
+    <div
+      className={styles.orderPanel}
+      style={{ zIndex: z, ...swipeStyle }}
+      {...swipeHandlers}
+    >
+      <SwipeBackHint label="Scanner" swipeX={sSwipeX} />
+      <div className={styles.orderPanelList}>
+        {sItems.length === 0 ? (
+          <div className={styles.orderEmpty}>
+            <span className={styles.orderEmptyText}>No items yet</span>
+          </div>
+        ) : (
+          sItems.map((item) => {
+            const name =
+              item.catalogSnapshot?.catalogName ||
+              item.catalogSnapshot?.name ||
+              item.scannedBarcode ||
+              "(unknown)";
+            return (
+              <div key={item.id} className={styles.orderItemRow}>
+                <span className={styles.orderItemName}>{name}</span>
+                <span className={styles.orderItemQty}>×{item.qty || 0}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+      <div className={styles.orderPanelFooter}>
+        <button
+          type="button"
+          className={styles.orderPanelCloseBtn}
+          onClick={onClose}
+          aria-label="Close order panel"
+        >
+          <img src={ICONS.redx} alt="" className={styles.orderPanelCloseIcon} />
+        </button>
+        <span className={styles.orderPanelTitle}>Order Contents</span>
+      </div>
+    </div>
+  );
+}
+
+function QtyModal({ itemName, scannedBarcode, resolved, onSubmit, onDismiss }) {
   const z = useZ("modal");
   const [sCustom, _setCustom] = useState(10);
   const [sFocused, _setFocused] = useState(false);
@@ -252,8 +432,12 @@ function QtyModal({ itemName, scannedBarcode, resolved, onSubmit }) {
   }
 
   return (
-    <div className={styles.modalOverlay} style={{ zIndex: z }}>
-      <div className={styles.modalCard}>
+    <div
+      className={styles.modalOverlay}
+      style={{ zIndex: z }}
+      onClick={onDismiss}
+    >
+      <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           {itemName ? (
             <span className={styles.itemName}>{itemName}</span>

@@ -48,6 +48,9 @@ const CustomInputRow = ({
   onChange,
   onSubmit,
   canSubmit,
+  showPerItemToggle = false,
+  perItem = false,
+  onTogglePerItem,
 }) => (
   <div
     className={styles.customRow}
@@ -73,6 +76,25 @@ const CustomInputRow = ({
         backgroundColor: val ? lightenRGBByPercent(C.lightred, 60) : "white",
       }}
     />
+    {showPerItemToggle && (
+      <button
+        type="button"
+        className={styles.perItemToggle}
+        onClick={(e) => {
+          e.stopPropagation();
+          onTogglePerItem?.(!perItem);
+        }}
+        aria-pressed={perItem}
+        aria-label={perItem ? "Per item (click to switch to per line)" : "Per line (click to switch to per item)"}
+        style={{
+          borderColor: C.buttonLightGreenOutline,
+          backgroundColor: perItem ? C.green : "white",
+          color: perItem ? C.textWhite : C.text,
+        }}
+      >
+        {perItem ? "EA" : "LN"}
+      </button>
+    )}
     <button
       className={styles.customSubmit}
       onClick={onSubmit}
@@ -96,7 +118,10 @@ const MenuContent = ({
   pctInitial,
   dolInitialDisplay,
   dolInitialCents,
-  maxDiscountCents,
+  dolInitialPerItem,
+  unitPriceCents,
+  qty,
+  maxLineCents,
   close,
   onSelectDiscount,
   onCustomPercent,
@@ -105,6 +130,10 @@ const MenuContent = ({
   const [pct, setPct] = useState(pctInitial);
   const [dol, setDol] = useState(dolInitialDisplay);
   const [dolCents, setDolCents] = useState(dolInitialCents);
+  const [perItem, setPerItem] = useState(!!dolInitialPerItem);
+
+  const showPerItemToggle = (qty || 1) > 1;
+  const dolCap = perItem ? unitPriceCents : maxLineCents;
 
   const handlePctChange = (raw) => {
     let cleaned = raw.replace(/[^0-9]/g, "");
@@ -118,13 +147,23 @@ const MenuContent = ({
 
   const handleDolChange = (raw) => {
     let result = usdTypeMask(raw);
-    if (maxDiscountCents && result.cents > maxDiscountCents) {
-      result = usdTypeMask(String(maxDiscountCents));
+    if (dolCap && result.cents > dolCap) {
+      result = usdTypeMask(String(dolCap));
     }
     setDol(result.display);
     setDolCents(result.cents);
     if (result.display) {
       setPct("");
+    }
+  };
+
+  const handleTogglePerItem = (next) => {
+    setPerItem(next);
+    const nextCap = next ? unitPriceCents : maxLineCents;
+    if (nextCap && dolCents > nextCap) {
+      const clamped = usdTypeMask(String(nextCap));
+      setDol(clamped.display);
+      setDolCents(clamped.cents);
     }
   };
 
@@ -138,7 +177,7 @@ const MenuContent = ({
   const submitDol = () => {
     if (!dolCents) return;
     close();
-    onCustomDollar?.(dolCents);
+    onCustomDollar?.(dolCents, perItem);
   };
 
   return (
@@ -231,6 +270,9 @@ const MenuContent = ({
         onChange={handleDolChange}
         onSubmit={submitDol}
         canSubmit={dolCents > 0}
+        showPerItemToggle={showPerItemToggle}
+        perItem={perItem}
+        onTogglePerItem={handleTogglePerItem}
       />
     </>
   );
@@ -244,7 +286,8 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
     onRemove,
     discounts = [],
     currentDiscount = null,
-    maxDiscountCents = 0,
+    unitPriceCents = 0,
+    qty = 1,
     onSelectDiscount,
     onCustomPercent,
     onCustomDollar,
@@ -353,12 +396,14 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
   const dolInitialCents = isCustomDol ? Number(currentDiscount.value || 0) : 0;
   const dolInitialDisplay =
     dolInitialCents > 0 ? (dolInitialCents / 100).toFixed(2) : "";
+  const dolInitialPerItem = isCustomDol ? !!currentDiscount.perItem : false;
 
-  const filteredDiscounts = (discounts || []).filter(
-    (o) =>
-      o.type !== DISCOUNT_TYPES.dollar ||
-      Number(o.value) <= (maxDiscountCents || 0)
-  );
+  const maxLineCents = (unitPriceCents || 0) * (qty || 1);
+  const filteredDiscounts = (discounts || []).filter((o) => {
+    if (o.type !== DISCOUNT_TYPES.dollar) return true;
+    const cap = o.perItem ? unitPriceCents : maxLineCents;
+    return Number(o.value) <= (cap || 0);
+  });
 
   const close = () => setOpen(false);
 
@@ -434,7 +479,10 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
               pctInitial={pctInitial}
               dolInitialDisplay={dolInitialDisplay}
               dolInitialCents={dolInitialCents}
-              maxDiscountCents={maxDiscountCents}
+              dolInitialPerItem={dolInitialPerItem}
+              unitPriceCents={unitPriceCents}
+              qty={qty}
+              maxLineCents={maxLineCents}
               close={close}
               onSelectDiscount={onSelectDiscount}
               onCustomPercent={onCustomPercent}

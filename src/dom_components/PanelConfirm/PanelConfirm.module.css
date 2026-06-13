@@ -1,0 +1,99 @@
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 18%;
+  padding-left: 24px;
+  padding-right: 24px;
+  z-index: 1000; /* z-allow: panel-scoped confirm; sits in Info_ActiveWorkorder's local stacking context above autocomplete dropdowns (z-index 999) */
+}
+
+.card {
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  border-radius: 14px;
+  padding: 26px 32px 22px 32px;
+  min-width: 0;
+  width: 100%;
+  max-width: 560px;
+  text-align: center;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--border-default);
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  letter-spacing: 0.3px;
+}
+
+.message {
+  font-size: 18px;
+  font-weight: 400;
+  margin: 0 0 22px 0;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 14px;
+}
+
+.btn {
+  flex: 1;
+  padding: 12px 18px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: transform 80ms ease, filter 120ms ease;
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btnYes {
+  background-color: var(--accent);
+  color: #ffffff;
+}
+
+.btnNo {
+  background-color: var(--surface-alt);
+  color: var(--text-default);
+  border: 1px solid var(--border-default);
+}
+
+.centered {
+  align-items: center;
+  padding-top: 0;
+}
+
+.large {
+  padding-top: 30%;
+}
+
+.large .title {
+  font-size: 37px;
+}
+
+.large .message {
+  font-size: 33px;
+}
+
+.large .btn {
+  font-size: 33px;
+}

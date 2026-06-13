@@ -5,13 +5,14 @@
   flex-direction: column;
   background-color: var(--surface-alt);
   box-sizing: border-box;
+  position: relative;
 }
 
 .header {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border-default);
   background-color: var(--surface-accent-muted);
@@ -31,6 +32,18 @@
   cursor: pointer;
 }
 
+.backLabelBtn {
+  border: none;
+  background-color: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .title {
   font-size: 18px;
   font-weight: 600;
@@ -39,16 +52,49 @@
   text-align: center;
 }
 
-.newButton {
+.actionRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+  width: 100%;
+  margin: 12px 0 4px;
   flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.priceCheckBtn {
+  width: 40%;
+  flex-shrink: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  background-color: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.priceCheckBtn:active {
+  background-color: var(--surface-accent-muted);
+}
+
+.newBtn {
+  width: 40%;
+  flex-shrink: 0;
+  padding: 12px 14px;
   border: 1px solid var(--accent);
   background-color: var(--accent);
   color: var(--text-on-accent);
   font-size: 14px;
-  font-weight: 600;
-  padding: 6px 12px;
+  font-weight: 700;
   border-radius: var(--radius-control);
   cursor: pointer;
+}
+
+.newBtn:active {
+  background-color: var(--accent-hover);
 }
 
 .list {
@@ -66,7 +112,7 @@
 .card {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   padding: 12px 14px;
   border: 1px solid var(--border-default);
   background-color: var(--surface-raised);
@@ -74,6 +120,56 @@
   cursor: pointer;
   text-align: left;
   gap: 4px;
+}
+
+.cardRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.cardTextCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cardActions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cardIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background-color: transparent;
+  border-radius: var(--radius-control);
+  padding: 6px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.cardIconBtn:hover {
+  transform: translateY(-2px);
+}
+
+.cardIconImg {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
 }
 
 .cardDate {

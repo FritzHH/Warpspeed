@@ -29,7 +29,6 @@ import {
   useCustomerSearchStore,
   useTabNamesStore,
   useSettingsStore,
-  useLoginStore,
   useAlertScreenStore,
   broadcastFullWorkorderToDisplay,
 } from "../../stores";
@@ -81,16 +80,18 @@ export const Items_Section = React.memo(({}) => {
   const zOptionsTabName = useTabNamesStore((state) => state.optionsTabName);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
 
-  function fireTestPunchClockAlert() {
-    let user = useLoginStore.getState().currentUser;
-    let firstName = user?.first || "there";
+  function fireTestWarningAlert() {
     useAlertScreenStore.getState().setValues({
-      message: "Hi " + firstName + ", you are not clocked in. Would you like to punch in now?",
-      btn1Text: "CLOCK IN",
-      btn2Text: "NOT NOW",
+      title: "Heads up",
+      severity: "warning",
+      message:
+        "This is the new warning-level alert layout. Review the header, body, and footer styling.",
+      subMessage:
+        "Warning severity is for destructive actions or attention-required notices.",
+      btn1Text: "LOOKS GOOD",
+      btn2Text: "CANCEL",
       handleBtn1Press: () => {},
       handleBtn2Press: () => {},
-      showAlert: true,
     });
   }
 
@@ -143,7 +144,7 @@ export const Items_Section = React.memo(({}) => {
       <TabBar
         onTranslatePress={() => _sSetShowTranslateModal(true)}
         onDevNotesPress={() => _sSetShowDevNotes(true)}
-        onTestModalPress={() => fireTestPunchClockAlert()}
+        onTestModalPress={() => fireTestWarningAlert()}
       />
       {ScreenComponent()}
       <TranslateModal
@@ -418,7 +419,7 @@ const TabBar = ({ onTranslatePress, onDevNotesPress, onTestModalPress }) => {
 
       <div className={sectionStyles.rightGroup}>
         {IS_DEV && (
-          <Tooltip text="Open Punch Clock (dev only)" position="bottom">
+          <Tooltip text="Test global alert - warning (dev only)" position="bottom">
             <button type="button" className={sectionStyles.iconButton} onClick={onTestModalPress}>
               <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>TEST</span>
             </button>

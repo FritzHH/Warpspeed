@@ -157,8 +157,13 @@ function applyDiscountToWorkorderItem(workorderLineObj, returnAsDiscountObj) {
     newPrice = workorderLineObj.inventoryItem.price * workorderLineObj.qty * multiplier;
     savings = workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
   } else {
-    newPrice = workorderLineObj.inventoryItem.price * workorderLineObj.qty - Number(discountObj.value);
-    savings = workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
+    // perItem multiplies value by qty (per-unit deduction); otherwise flat off the line.
+    // Cap deduction at the line subtotal so newPrice never goes negative.
+    var lineSubtotal = workorderLineObj.inventoryItem.price * workorderLineObj.qty;
+    var rawDeduct = Number(discountObj.value) * (discountObj.perItem ? (workorderLineObj.qty || 1) : 1);
+    var deduct = Math.min(rawDeduct, lineSubtotal);
+    newPrice = lineSubtotal - deduct;
+    savings = deduct;
   }
   var newDiscountObj = Object.assign({}, discountObj, {
     newPrice: Math.round(newPrice),

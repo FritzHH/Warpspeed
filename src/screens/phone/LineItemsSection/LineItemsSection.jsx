@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { ICONS } from "../../../styles";
 import { formatCurrencyDisp } from "../../../utils";
-import { Image, DropdownMenu, TouchableOpacity } from "../../../dom_components";
+import {
+  Image,
+  LineItemActionRow,
+  TouchableOpacity,
+} from "../../../dom_components";
 import styles from "./LineItemsSection.module.css";
-
-const DISCOUNT_DROPDOWN_BUTTON_STYLE = {
-  backgroundColor: "transparent",
-  borderWidth: 0,
-  padding: 6,
-};
 
 export function LineItemsSection({
   workorder,
@@ -31,7 +29,7 @@ export function LineItemsSection({
       <div className={styles.headerRow}>
         <span className={styles.headerLabel}>ITEMS ({runningQty})</span>
         <TouchableOpacity onPress={onOpenItemSearch} className={styles.addBtn}>
-          <Image icon={ICONS.add} size={20} />
+          <Image icon={ICONS.add} size={29} />
         </TouchableOpacity>
       </div>
 
@@ -56,11 +54,8 @@ export function LineItemsSection({
             <div className={styles.lineTop}>
               <TouchableOpacity
                 onPress={() => _setEditingLineId(isEditing ? null : line.id)}
-                className={styles.editBtn}
+                className={styles.lineInfo}
               >
-                <Image icon={ICONS.editPencil} size={16} />
-              </TouchableOpacity>
-              <div className={styles.lineInfo}>
                 <span className={styles.lineName}>{name}</span>
                 {line.qty > 1 && (
                   <span className={styles.lineQty}>Qty: {line.qty}</span>
@@ -73,7 +68,7 @@ export function LineItemsSection({
                       : ""}
                   </span>
                 )}
-              </div>
+              </TouchableOpacity>
               <div className={styles.linePriceCol}>
                 {showUnit && (
                   <span
@@ -93,64 +88,20 @@ export function LineItemsSection({
             </div>
 
             {isEditing && (
-              <div className={styles.editControlsRow}>
-                <div className={styles.qtyGroup}>
-                  <TouchableOpacity
-                    onPress={() => modifyLineQty(line, "down")}
-                    disabled={line.qty <= 1}
-                    className={line.qty <= 1 ? styles.qtyBtnDisabled : styles.qtyBtn}
-                  >
-                    <Image icon={ICONS.downArrowOrange} size={22} />
-                  </TouchableOpacity>
-                  <span className={styles.qtyValue}>{line.qty}</span>
-                  <TouchableOpacity
-                    onPress={() => modifyLineQty(line, "up")}
-                    className={styles.qtyBtn}
-                  >
-                    <Image icon={ICONS.upArrowOrange} size={22} />
-                  </TouchableOpacity>
-                </div>
-                <div className={styles.actionsGroup}>
-                  {line.qty > 1 && (
-                    <TouchableOpacity
-                      onPress={() => splitLineItem(line, idx)}
-                      className={styles.actionBtn}
-                    >
-                      <Image icon={ICONS.axe} size={22} />
-                    </TouchableOpacity>
-                  )}
-                  <DropdownMenu
-                    buttonIcon={ICONS.dollar}
-                    buttonIconSize={22}
-                    buttonStyle={DISCOUNT_DROPDOWN_BUTTON_STYLE}
-                    centerMenuVertically={true}
-                    centerMenuHorizontally={true}
-                    dataArr={[
-                      { label: "No Discount" },
-                      ...zDiscounts.map((o) => ({ label: o.name })),
-                    ]}
-                    onSelect={(selected) => {
-                      if (selected.label === "No Discount") {
-                        clearLineDiscount(line);
-                      } else {
-                        const discountObj = zDiscounts.find(
-                          (o) => o.name === selected.label
-                        );
-                        if (discountObj) applyLineDiscount(line, discountObj);
-                      }
-                    }}
-                  />
-                  <TouchableOpacity
-                    onPress={() => {
-                      _setEditingLineId(null);
-                      deleteLineItem(idx);
-                    }}
-                    className={styles.actionBtn}
-                  >
-                    <Image icon={ICONS.trash} size={22} />
-                  </TouchableOpacity>
-                </div>
-              </div>
+              <LineItemActionRow
+                qty={line.qty}
+                itemName={name}
+                deleteMessage={`${name} will be removed from this workorder.`}
+                onQtyChange={(direction) => modifyLineQty(line, direction)}
+                onSplit={() => splitLineItem(line, idx)}
+                onDelete={() => {
+                  _setEditingLineId(null);
+                  deleteLineItem(idx);
+                }}
+                discounts={zDiscounts}
+                onApplyDiscount={(discountObj) => applyLineDiscount(line, discountObj)}
+                onClearDiscount={() => clearLineDiscount(line)}
+              />
             )}
           </div>
         );

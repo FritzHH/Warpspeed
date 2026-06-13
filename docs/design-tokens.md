@@ -132,7 +132,8 @@ This is the only layer components ever touch.
 | `--surface-raised`       | `#ffffff`              | `var(--gray-800)`     | Modals, popovers, dropdowns (lifted from base) |
 | `--surface-accent-muted` | `rgb(232,239,245)`     | `var(--brand-800)`    | Accent-tinted backgrounds (e.g. buttonLightGreen) |
 | `--surface-success-muted`| `var(--brand-50)`      | `var(--brand-800)`    | Success status banners |
-| `--surface-warning-muted`| `rgb(255,248,230)`     | `rgb(60,45,15)`       | Warning/caution banners (amber wash) |
+| `--surface-info-muted`   | `rgb(230,240,251)`     | `rgb(20,35,55)`       | Info status backgrounds (alert icon bubbles, banners) |
+| `--surface-warning-muted`| `rgb(255,243,220)`     | `rgb(60,45,15)`       | Warning/caution banners (amber wash) |
 | `--surface-overlay-light`| `rgba(0,0,0,0.1)`      | `rgba(0,0,0,0.3)`     | Faint dim (background blur, subtle wash) - 47 inline uses |
 | `--surface-overlay-medium`| `rgba(0,0,0,0.3)`     | `rgba(0,0,0,0.5)`     | Mid-weight tint (in-modal toasts, soft dimmers) |
 | `--surface-overlay`      | `rgba(0,0,0,0.5)`      | `rgba(0,0,0,0.7)`     | Standard modal scrim / backdrop (workhorse - 76 inline uses) |

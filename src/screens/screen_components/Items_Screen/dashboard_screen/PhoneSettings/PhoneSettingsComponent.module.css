@@ -195,6 +195,15 @@
   flex-shrink: 0;
 }
 
+.greetingTitleRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .greetingTitle {
   font-weight: 600;
   color: var(--text-default);
@@ -205,6 +214,32 @@
   color: var(--text-muted);
   font-size: 12px;
   margin-top: -4px;
+}
+
+.saveBtn {
+  flex-shrink: 0;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: transform 120ms, background-color 120ms;
+}
+
+.saveBtnEnabled {
+  background-color: var(--positive-base, #22c55e);
+  color: white;
+  cursor: pointer;
+}
+
+.saveBtnEnabled:hover {
+  transform: translateY(-1px);
+}
+
+.saveBtnDisabled {
+  background-color: var(--surface-hover, rgba(0, 0, 0, 0.06));
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 
 .typeToggleRow {

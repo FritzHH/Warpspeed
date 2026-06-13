@@ -5,3 +5,17 @@
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif;
 }
+
+/* Layout-transparent wrapper for the entire /phone route. iOS Safari
+   auto-zooms on focus into any input < 16px font-size; bumping editable
+   elements to 16px across the phone route prevents that zoom without
+   touching desktop visuals. */
+.phoneRoute {
+  display: contents;
+}
+
+.phoneRoute input,
+.phoneRoute textarea,
+.phoneRoute select {
+  font-size: 16px;
+}

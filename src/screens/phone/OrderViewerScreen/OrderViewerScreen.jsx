@@ -1,23 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useInventoryStore, useSettingsStore } from "../../../stores";
+import { ROUTES } from "../../../routes";
 import {
+  useAlertScreenStore,
+  useInventoryStore,
+  useSettingsStore,
+} from "../../../stores";
+import {
+  dbDeleteVendorOrderItem,
   dbListenToVendorOrderItems,
-  dbListenToVendorOrders,
-  readInventoryQtyMap,
+  dbUpdateVendorOrderItemFields,
 } from "../../../db_calls_wrapper";
-import { VENDOR_CATALOGS } from "../../../data";
-import { formatCurrencyDisp } from "../../../utils";
+import {
+  AlertBox,
+  LineItemActionRow,
+  SwipeBackHint,
+  TouchableOpacity,
+} from "../../../dom_components";
 import styles from "./OrderViewerScreen.module.css";
-
-const TOGGLE_FIELDS = [
-  { key: "vendor",    label: "Vendor"     },
-  { key: "qtyAvail",  label: "Qty Avail"  },
-  { key: "cost",      label: "Cost"       },
-  { key: "price",     label: "Price"      },
-  { key: "salePrice", label: "Sale Price" },
-  { key: "msrp",      label: "MSRP"       },
-];
 
 export function OrderViewerScreen() {
   const navigate = useNavigate();
@@ -27,31 +27,49 @@ export function OrderViewerScreen() {
   const zActiveOrderID = useSettingsStore(
     (s) => s.getSettings()?.activeVendorOrderID || "",
   );
-  const zVendors = useSettingsStore((s) => s.getSettings()?.vendors) || {};
+  const zShowAlert = useAlertScreenStore((s) => s.showAlert);
 
-  const [sOrder, _setOrder] = useState(null);
   const [sItems, _setItems] = useState([]);
-  const [sVisible, _setVisible] = useState(() => ({
-    vendor: false,
-    qtyAvail: false,
-    cost: false,
-    price: false,
-    salePrice: false,
-    msrp: false,
-  }));
-  const [sQtyMap, _setQtyMap] = useState(() => new Map());
+  const [sEditingItemID, _setEditingItemID] = useState(null);
 
-  // Order header listener — gives us the name + lets us notice if it gets
-  // closed/deleted while the user is viewing.
-  useEffect(() => {
-    const unsub = dbListenToVendorOrders((data) => {
-      const arr = Array.isArray(data) ? data : [];
-      _setOrder(arr.find((o) => o.id === orderID) || null);
-    });
-    return () => {
-      if (typeof unsub === "function") unsub();
-    };
-  }, [orderID]);
+  const [sSwipeX, _setSwipeX] = useState(0);
+  const [sSwiping, _setSwiping] = useState(false);
+  const swipeStartRef = useRef(null);
+
+  function handleSwipeStart(e) {
+    const t = e.touches[0];
+    if (t.clientX > 30) return;
+    swipeStartRef.current = { x: t.clientX, time: Date.now() };
+    _setSwiping(true);
+  }
+  function handleSwipeMove(e) {
+    if (!swipeStartRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeStartRef.current.x;
+    if (dx > 0) _setSwipeX(dx);
+  }
+  function handleSwipeEnd() {
+    if (!swipeStartRef.current) return;
+    const elapsed = Date.now() - swipeStartRef.current.time;
+    const velocity = sSwipeX / Math.max(elapsed, 1);
+    const commitThreshold = window.innerWidth * 0.3;
+    const isCommit = sSwipeX > commitThreshold || velocity > 0.5;
+    swipeStartRef.current = null;
+    _setSwiping(false);
+    if (isCommit) {
+      _setSwipeX(window.innerWidth);
+      setTimeout(() => {
+        navigate(ROUTES.phoneOrdering + "?switch=1");
+        _setSwipeX(0);
+      }, 200);
+    } else {
+      _setSwipeX(0);
+    }
+  }
+  const swipeStyle = {
+    transform: `translateX(${sSwipeX}px)`,
+    transition: sSwiping ? "none" : "transform 200ms ease",
+  };
 
   // Items listener — read-only here; the row component just renders.
   useEffect(() => {
@@ -64,52 +82,20 @@ export function OrderViewerScreen() {
     };
   }, [orderID]);
 
-  // Per-vendor batched qty-avail lookup. Only runs when the qty-avail toggle
-  // is on so we don't burn reads users didn't ask for.
-  const lookupKey = useMemo(() => {
-    if (!sVisible.qtyAvail) return "";
-    return sItems
-      .filter((it) => it.vendorCatalogID && it.vendorItemID)
-      .map((it) => `${it.vendorCatalogID}:${it.vendorItemID}`)
-      .sort()
-      .join(",");
-  }, [sItems, sVisible.qtyAvail]);
+  async function handleQtyChange(item, direction) {
+    const current = Number(item.qty || 0);
+    const next = direction === "up" ? current + 1 : Math.max(current - 1, 1);
+    if (next === current) return;
+    try {
+      await dbUpdateVendorOrderItemFields(orderID, item.id, { qty: next });
+    } catch {}
+  }
 
-  useEffect(() => {
-    if (!lookupKey) {
-      _setQtyMap(new Map());
-      return;
-    }
-    let cancelled = false;
-    const byVendor = new Map();
-    lookupKey.split(",").forEach((pair) => {
-      const [vendorID, itemID] = pair.split(":");
-      if (!byVendor.has(vendorID)) byVendor.set(vendorID, []);
-      byVendor.get(vendorID).push(itemID);
-    });
-    (async () => {
-      const next = new Map();
-      await Promise.all(
-        Array.from(byVendor.entries()).map(async ([vendorID, itemIDs]) => {
-          const warehouseCode = zVendors?.[vendorID]?.warehouseCode || "";
-          if (!warehouseCode) return;
-          const qtyForVendor = await readInventoryQtyMap(
-            vendorID,
-            warehouseCode,
-            itemIDs,
-          );
-          qtyForVendor.forEach((qty, itemID) => next.set(itemID, qty));
-        }),
-      );
-      if (!cancelled) _setQtyMap(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [lookupKey, zVendors]);
-
-  function toggleField(key) {
-    _setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+  async function handleDeleteItem(item) {
+    _setEditingItemID(null);
+    try {
+      await dbDeleteVendorOrderItem(orderID, item.id);
+    } catch {}
   }
 
   function handleSetActive() {
@@ -117,47 +103,31 @@ export function OrderViewerScreen() {
     navigate("/phone/ordering/" + orderID);
   }
 
+  function handleScanItems() {
+    navigate("/phone/ordering/" + orderID);
+  }
+
   const isActive = orderID === zActiveOrderID;
-  const orderName = sOrder?.name || "Order";
 
   return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <button
-          className={styles.backButton}
-          onClick={() => navigate("/phone/ordering?switch=1")}
-        >
-          ←
-        </button>
-        <span className={styles.title}>{orderName}</span>
-        {isActive ? (
-          <span className={styles.activeTag}>ACTIVE</span>
-        ) : (
-          <button
-            className={styles.setActiveBtn}
-            onClick={handleSetActive}
-          >
-            Set Active
-          </button>
-        )}
-      </div>
+    <div
+      className={styles.root}
+      onTouchStart={handleSwipeStart}
+      onTouchMove={handleSwipeMove}
+      onTouchEnd={handleSwipeEnd}
+      style={swipeStyle}
+    >
+      <SwipeBackHint label="Ordering" swipeX={sSwipeX} />
+      <AlertBox showAlert={zShowAlert} />
 
-      <div className={styles.toggleBar}>
-        {TOGGLE_FIELDS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            className={
-              sVisible[f.key]
-                ? `${styles.toggleChip} ${styles.toggleChipOn}`
-                : styles.toggleChip
-            }
-            onClick={() => toggleField(f.key)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {!isActive && (
+        <button
+          className={styles.setActiveFab}
+          onClick={handleSetActive}
+        >
+          Set Active
+        </button>
+      )}
 
       <div className={styles.list}>
         {sItems.length === 0 && (
@@ -165,25 +135,43 @@ export function OrderViewerScreen() {
             <span className={styles.emptyText}>No items in this order yet.</span>
           </div>
         )}
-        {sItems.map((item) => (
-          <ItemRow
-            key={item.id}
-            item={item}
-            inventory={zInventoryArr}
-            visible={sVisible}
-            warehouseQty={
-              item.vendorItemID && sQtyMap.has(item.vendorItemID)
-                ? sQtyMap.get(item.vendorItemID)
-                : null
-            }
-          />
-        ))}
+        {sItems.map((item) => {
+          const isEditing = sEditingItemID === item.id;
+          return (
+            <ItemRow
+              key={item.id}
+              item={item}
+              inventory={zInventoryArr}
+              isEditing={isEditing}
+              onToggleEdit={() =>
+                _setEditingItemID(isEditing ? null : item.id)
+              }
+              onQtyChange={(direction) => handleQtyChange(item, direction)}
+              onDelete={() => handleDeleteItem(item)}
+            />
+          );
+        })}
       </div>
+
+      <button
+        type="button"
+        className={styles.scanBtn}
+        onClick={handleScanItems}
+      >
+        SCAN ITEMS
+      </button>
     </div>
   );
 }
 
-function ItemRow({ item, inventory, visible, warehouseQty }) {
+function ItemRow({
+  item,
+  inventory,
+  isEditing,
+  onToggleEdit,
+  onQtyChange,
+  onDelete,
+}) {
   const localMatch = useMemo(() => {
     const code = String(item.scannedBarcode || "");
     if (!code) return null;
@@ -204,67 +192,68 @@ function ItemRow({ item, inventory, visible, warehouseQty }) {
   const displayName =
     storeName || catalogName || item.scannedBarcode || "(unknown)";
 
-  const vendorID = item.vendorCatalogID || "";
-  const vendorName =
-    VENDOR_CATALOGS.find((v) => v.id === vendorID)?.displayName ||
-    vendorID ||
-    "—";
+  const [sSwipeX, _setSwipeX] = useState(0);
+  const [sSwiping, _setSwiping] = useState(false);
+  const swipeStartRef = useRef(null);
 
-  const cost = item.catalogSnapshot?.cost ?? localMatch?.cost ?? "";
-  const price = localMatch?.price;
-  const salePrice = localMatch?.salePrice;
-  const msrp = localMatch?.msrp;
+  function handleTouchStart(e) {
+    const t = e.touches[0];
+    // Leave the leftmost edge to the screen-level back-swipe handler.
+    if (t.clientX < 50) return;
+    swipeStartRef.current = { x: t.clientX, time: Date.now() };
+    _setSwiping(true);
+  }
+  function handleTouchMove(e) {
+    if (!swipeStartRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeStartRef.current.x;
+    _setSwipeX(dx < 0 ? dx : 0);
+  }
+  function handleTouchEnd() {
+    if (!swipeStartRef.current) return;
+    const elapsed = Date.now() - swipeStartRef.current.time;
+    const distance = Math.abs(sSwipeX);
+    const velocity = distance / Math.max(elapsed, 1);
+    const commitThreshold = window.innerWidth * 0.35;
+    const isCommit = distance > commitThreshold || velocity > 0.6;
+    swipeStartRef.current = null;
+    _setSwiping(false);
+    if (isCommit) {
+      _setSwipeX(-window.innerWidth);
+      setTimeout(() => onDelete(), 180);
+    } else {
+      _setSwipeX(0);
+    }
+  }
+
+  const swipeStyle = {
+    transform: `translateX(${sSwipeX}px)`,
+    transition: sSwiping ? "none" : "transform 200ms ease",
+    touchAction: "pan-y",
+  };
 
   return (
-    <div className={styles.itemRow}>
-      <div className={styles.itemTopRow}>
+    <div
+      className={styles.itemRow}
+      style={swipeStyle}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <TouchableOpacity onPress={onToggleEdit} className={styles.itemTopRow}>
         <span className={styles.itemName}>{displayName}</span>
         <span className={styles.itemQty}>×{item.qty || 0}</span>
-      </div>
-      {(visible.vendor ||
-        visible.qtyAvail ||
-        visible.cost ||
-        visible.price ||
-        visible.salePrice ||
-        visible.msrp) && (
-        <div className={styles.itemDetails}>
-          {visible.vendor && (
-            <DetailChip label="Vendor" value={vendorName} />
-          )}
-          {visible.qtyAvail && (
-            <DetailChip
-              label="Avail"
-              value={warehouseQty == null ? "—" : String(warehouseQty)}
-            />
-          )}
-          {visible.cost && (
-            <DetailChip label="Cost" value={fmtMoney(cost)} />
-          )}
-          {visible.price && (
-            <DetailChip label="Price" value={fmtMoney(price)} />
-          )}
-          {visible.salePrice && (
-            <DetailChip label="Sale" value={fmtMoney(salePrice)} />
-          )}
-          {visible.msrp && <DetailChip label="MSRP" value={fmtMoney(msrp)} />}
-        </div>
+      </TouchableOpacity>
+      {isEditing && (
+        <LineItemActionRow
+          qty={item.qty || 1}
+          itemName={displayName}
+          deleteMessage={`${displayName} will be removed from this order.`}
+          onQtyChange={onQtyChange}
+          onDelete={onDelete}
+          skipConfirm={true}
+        />
       )}
     </div>
   );
-}
-
-function DetailChip({ label, value }) {
-  return (
-    <div className={styles.detailChip}>
-      <span className={styles.detailLabel}>{label}</span>
-      <span className={styles.detailValue}>{value || "—"}</span>
-    </div>
-  );
-}
-
-function fmtMoney(v) {
-  if (v === "" || v == null) return "";
-  const n = typeof v === "number" ? v : parseFloat(v);
-  if (!isFinite(n) || n <= 0) return "";
-  return formatCurrencyDisp(n);
 }

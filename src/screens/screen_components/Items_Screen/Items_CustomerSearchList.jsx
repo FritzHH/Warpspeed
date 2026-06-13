@@ -93,6 +93,12 @@ export function CustomerSearchListComponent({}) {
     useCustomerSearchStore.getState().reset();
   });
 
+  const handleOpenCustomerInfo = useGatedAction(() => {
+    useRecentCustomersStore.getState().addRecentCustomer(sSelectedCustomer);
+    _setCustomerInfo(sSelectedCustomer);
+    _setSelectedCustomer(null);
+  });
+
   return (
     <div className={styles.root}>
       <img
@@ -216,11 +222,7 @@ export function CustomerSearchListComponent({}) {
               <Button
                 text="Customer Info"
                 colorGradientArr={COLOR_GRADIENTS.blue}
-                onPress={() => {
-                  useRecentCustomersStore.getState().addRecentCustomer(sSelectedCustomer);
-                  _setCustomerInfo(sSelectedCustomer);
-                  _setSelectedCustomer(null);
-                }}
+                onPress={handleOpenCustomerInfo}
                 buttonStyle={{ width: 200, height: 45, marginTop: 15 }}
                 textStyle={{ fontSize: 16 }}
               />

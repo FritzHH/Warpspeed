@@ -49,6 +49,15 @@ export function RecentCustomersComponent() {
     useCustomerSearchStore.getState().reset();
   });
 
+  const handleOpenCustomerInfoFromRecent = useGatedAction(async () => {
+    let customer = await dbGetCustomer(sSelectedCustomer.id);
+    _setSelectedCustomer(null);
+    if (customer) {
+      useRecentCustomersStore.getState().addRecentCustomer(customer);
+      _setCustomerInfo(customer);
+    }
+  });
+
   if (zRecentCustomers.length === 0) {
     return (
       <div className={styles.emptyRoot}>
@@ -153,14 +162,7 @@ export function RecentCustomersComponent() {
               <Button
                 text="Customer Info"
                 colorGradientArr={COLOR_GRADIENTS.blue}
-                onPress={async () => {
-                  let customer = await dbGetCustomer(sSelectedCustomer.id);
-                  _setSelectedCustomer(null);
-                  if (customer) {
-                    useRecentCustomersStore.getState().addRecentCustomer(customer);
-                    _setCustomerInfo(customer);
-                  }
-                }}
+                onPress={handleOpenCustomerInfoFromRecent}
                 buttonStyle={{ width: 200, height: 45, marginTop: 15 }}
                 textStyle={{ fontSize: 16 }}
               />

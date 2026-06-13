@@ -2,7 +2,8 @@
 
 import { capitalizeFirstLetterOfString, checkInputForNumbersOnly, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, formatPhoneWithParens, createNewWorkorder, generateEAN13Barcode, generate36CharUUID, lightenRGBByPercent, log, deepEqual, printBuilder, removeUnusedFields, resolveStatus, calculateWaitEstimateLabel, findTemplateByType, scheduleAutoText, localStorageWrapper, getPrinterStatus } from "../../../utils";
 import {
-  AutoJumpBlocker,
+  PanelJumpBlocker,
+  PanelConfirm,
   Button as Button_,
   CheckBox,
   DatePicker as DatePicker_,
@@ -18,8 +19,7 @@ import {
   Tooltip,
 } from "../../../dom_components";
 import { useAutoJumpBlock } from "../../../hooks/useAutoJumpBlock";
-import { useGatedInput, useGatedAction, sessionValid } from "../../../hooks/useLoginGate";
-import { confirmAddHint } from "../../../shared/confirmAddHint";
+import { useGatedInput, useGatedAction, useGatedPanel, sessionValid } from "../../../hooks/useLoginGate";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Radius } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
@@ -67,6 +67,27 @@ const RECEIPT_DROPDOWN_SELECTIONS = [
   RECEIPT_TYPES.workorder,
 ];
 
+const DAYS_OF_WEEK = [
+  { id: "sunday",    label: "Sunday" },
+  { id: "monday",    label: "Monday" },
+  { id: "tuesday",   label: "Tuesday" },
+  { id: "wednesday", label: "Wednesday" },
+  { id: "thursday",  label: "Thursday" },
+  { id: "friday",    label: "Friday" },
+  { id: "saturday",  label: "Saturday" },
+];
+
+// Returns the number of days from today until the next occurrence of the given day-of-week.
+// Same day-of-week as today returns 7 (next occurrence, never 0).
+function computeDaysUntilDay(dayId) {
+  const targetIdx = DAYS_OF_WEEK.findIndex((d) => d.id === dayId);
+  if (targetIdx < 0) return 0;
+  const todayIdx = new Date().getDay();
+  let diff = (targetIdx - todayIdx + 7) % 7;
+  if (diff === 0) diff = 7;
+  return diff;
+}
+
 const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12To24Parts, to24, updatePickupFields }) => {
   const [sShowDatePicker, _sSetShowDatePicker] = useState(false);
   const [sShowStartPicker, _sSetShowStartPicker] = useState(false);
@@ -83,13 +104,29 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
     cursor: "pointer",
   };
   const pillText = { fontSize: 12, color: "white", fontWeight: "600" };
-  const labelText = { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginRight: 4 };
+  const labelText = { fontSize: 11, color: C.textMuted, fontStyle: "italic" };
 
   const startParts = parse12To24Parts(pd.startTime);
   const endParts = parse12To24Parts(pd.endTime);
 
+  const handleResetPickup = () => {
+    useAlertScreenStore.getState().setValues({
+      title: "Clear Pickup/Delivery?",
+      message: "This will clear the pickup/delivery date and time from this ticket.",
+      severity: "warning",
+      btn1Text: "Clear",
+      handleBtn1Press: () => {
+        updatePickupFields({ month: "", day: "", startTime: "", endTime: "" });
+        useAlertScreenStore.getState().setShowAlert(false);
+      },
+      btn2Text: "Cancel",
+      handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+      canExitOnOuterClick: true,
+    });
+  };
+
   return (
-    <>
+    <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, width: "100%", boxSizing: "border-box" }}>
       <PopoverPrimitive.Root open={sShowDatePicker} onOpenChange={_sSetShowDatePicker}>
         <PopoverPrimitive.Anchor asChild>
           <button
@@ -118,58 +155,67 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
         </PopoverPrimitive.Portal>
       </PopoverPrimitive.Root>
 
-      <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
-        <PopoverPrimitive.Root open={sShowStartPicker} onOpenChange={_sSetShowStartPicker}>
-          <PopoverPrimitive.Anchor asChild>
-            <button type="button" disabled={isDonePaid} onClick={() => _sSetShowStartPicker(v => !v)} style={pillStyle}>
-              <span style={pillText}>{formatTime12(pd.startTime)}</span>
-            </button>
-          </PopoverPrimitive.Anchor>
-          <PopoverPrimitive.Portal>
-            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: zStart }}>
-              <div>
-                <TimePicker_
-                  initialHour={startParts.hour}
-                  initialMinute={startParts.minute}
-                  initialPeriod={startParts.period}
-                  onConfirm={({ hour, minute, period }) => {
-                    updatePickupFields({ startTime: to24(hour, minute, period) });
-                    _sSetShowStartPicker(false);
-                  }}
-                  onCancel={() => _sSetShowStartPicker(false)}
-                />
-              </div>
-            </PopoverPrimitive.Content>
-          </PopoverPrimitive.Portal>
-        </PopoverPrimitive.Root>
+      <PopoverPrimitive.Root open={sShowStartPicker} onOpenChange={_sSetShowStartPicker}>
+        <PopoverPrimitive.Anchor asChild>
+          <button type="button" disabled={isDonePaid} onClick={() => _sSetShowStartPicker(v => !v)} style={pillStyle}>
+            <span style={pillText}>{formatTime12(pd.startTime)}</span>
+          </button>
+        </PopoverPrimitive.Anchor>
+        <PopoverPrimitive.Portal>
+          <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: zStart }}>
+            <div>
+              <TimePicker_
+                initialHour={startParts.hour}
+                initialMinute={startParts.minute}
+                initialPeriod={startParts.period}
+                onConfirm={({ hour, minute, period }) => {
+                  updatePickupFields({ startTime: to24(hour, minute, period) });
+                  _sSetShowStartPicker(false);
+                }}
+                onCancel={() => _sSetShowStartPicker(false)}
+              />
+            </div>
+          </PopoverPrimitive.Content>
+        </PopoverPrimitive.Portal>
+      </PopoverPrimitive.Root>
 
-        <span style={{ ...labelText, marginLeft: 7 }}>to</span>
+      <span style={labelText}>to</span>
 
-        <PopoverPrimitive.Root open={sShowEndPicker} onOpenChange={_sSetShowEndPicker}>
-          <PopoverPrimitive.Anchor asChild>
-            <button type="button" disabled={isDonePaid} onClick={() => _sSetShowEndPicker(v => !v)} style={pillStyle}>
-              <span style={pillText}>{formatTime12(pd.endTime)}</span>
-            </button>
-          </PopoverPrimitive.Anchor>
-          <PopoverPrimitive.Portal>
-            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: zEnd }}>
-              <div>
-                <TimePicker_
-                  initialHour={endParts.hour}
-                  initialMinute={endParts.minute}
-                  initialPeriod={endParts.period}
-                  onConfirm={({ hour, minute, period }) => {
-                    updatePickupFields({ endTime: to24(hour, minute, period) });
-                    _sSetShowEndPicker(false);
-                  }}
-                  onCancel={() => _sSetShowEndPicker(false)}
-                />
-              </div>
-            </PopoverPrimitive.Content>
-          </PopoverPrimitive.Portal>
-        </PopoverPrimitive.Root>
-      </div>
-    </>
+      <PopoverPrimitive.Root open={sShowEndPicker} onOpenChange={_sSetShowEndPicker}>
+        <PopoverPrimitive.Anchor asChild>
+          <button type="button" disabled={isDonePaid} onClick={() => _sSetShowEndPicker(v => !v)} style={pillStyle}>
+            <span style={pillText}>{formatTime12(pd.endTime)}</span>
+          </button>
+        </PopoverPrimitive.Anchor>
+        <PopoverPrimitive.Portal>
+          <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: zEnd }}>
+            <div>
+              <TimePicker_
+                initialHour={endParts.hour}
+                initialMinute={endParts.minute}
+                initialPeriod={endParts.period}
+                onConfirm={({ hour, minute, period }) => {
+                  updatePickupFields({ endTime: to24(hour, minute, period) });
+                  _sSetShowEndPicker(false);
+                }}
+                onCancel={() => _sSetShowEndPicker(false)}
+              />
+            </div>
+          </PopoverPrimitive.Content>
+        </PopoverPrimitive.Portal>
+      </PopoverPrimitive.Root>
+
+      <button
+        type="button"
+        disabled={isDonePaid}
+        onClick={handleResetPickup}
+        className={styles.pickupResetBtn}
+        aria-label="Clear pickup/delivery"
+        title="Clear pickup/delivery"
+      >
+        <img src={ICONS.reset1} alt="" className={styles.pickupResetIcon} />
+      </button>
+    </div>
   );
 };
 
@@ -205,6 +251,7 @@ export const ActiveWorkorderComponent = ({}) => {
     React.useState(false);
   const [sShowMediaModal, _setShowMediaModal] = useState(false);
   const [sWaitTimeBlink, _setWaitTimeBlink] = useState(false);
+  const [sTargetDay, _sSetTargetDay] = useState("");
   const sUploadProgress = useUploadProgressStore((s) => s.progress);
   const [sTrackingModalVisible, _setTrackingModalVisible] = useState(false);
   const [sToastText, _sSetToastText] = useState("");
@@ -225,6 +272,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const hasCommittedRef = useRef(false);
   const hasActiveItem = sActiveOrderedItem !== null;
   const gate = useGatedInput();
+  const panelGate = useGatedPanel();
 
   const handleAddOrderedItem = useGatedAction(() => {
     const newItem = { ...cloneDeep(ITEM_ORDERED_PROTO), id: generate36CharUUID() };
@@ -280,28 +328,15 @@ export const ActiveWorkorderComponent = ({}) => {
     _setWaitDays(days);
   });
 
-  function handleNavigateRight() {
+  function handleNavigateToIndex(idx) {
     const items = zOpenWorkorder?.orderedItems || [];
     if (items.length === 0) return;
-    const nextIndex = sActiveOrderedIndex >= items.length - 1 ? 0 : sActiveOrderedIndex + 1;
-    _sSetActiveOrderedItem(cloneDeep(items[nextIndex]));
-    _sSetActiveOrderedIndex(nextIndex);
+    const targetIdx = Math.max(0, Math.min(idx, items.length - 1));
+    if (targetIdx === sActiveOrderedIndex) return;
+    const item = cloneDeep(items[targetIdx]);
+    _sSetActiveOrderedItem(item);
+    _sSetActiveOrderedIndex(targetIdx);
     hasCommittedRef.current = true;
-    const item = items[nextIndex];
-    const days = item.partOrderEstimateMillis && item.partOrderedMillis
-      ? Math.max(0, Math.round((item.partOrderEstimateMillis - item.partOrderedMillis) / MILLIS_IN_DAY))
-      : 0;
-    _setWaitDays(days);
-  }
-
-  function handleNavigateLeft() {
-    const items = zOpenWorkorder?.orderedItems || [];
-    if (items.length === 0) return;
-    const prevIndex = sActiveOrderedIndex <= 0 ? items.length - 1 : sActiveOrderedIndex - 1;
-    _sSetActiveOrderedItem(cloneDeep(items[prevIndex]));
-    _sSetActiveOrderedIndex(prevIndex);
-    hasCommittedRef.current = true;
-    const item = items[prevIndex];
     const days = item.partOrderEstimateMillis && item.partOrderedMillis
       ? Math.max(0, Math.round((item.partOrderEstimateMillis - item.partOrderedMillis) / MILLIS_IN_DAY))
       : 0;
@@ -328,6 +363,7 @@ export const ActiveWorkorderComponent = ({}) => {
       _sSetShowItemOrdering(false);
       _setWaitDays(0);
     }
+    _sSetTargetDay("");
   }, [zOpenWorkorder?.id]);
 
   // Estimated wait days — local state for instant UI, debounced write
@@ -373,6 +409,32 @@ export const ActiveWorkorderComponent = ({}) => {
   const brandBackspaced = useRef(false);
   const brandPrevValRef = useRef("");
   const autoJumpBlock = useAutoJumpBlock();
+  const [sHintConfirm, _setHintConfirm] = useState(null);
+
+  function promptAddHint({ kind, value, settingsKey }) {
+    if (!value || typeof value !== "string") return;
+    const trimmed = value.trim();
+    if (trimmed.length < 3) return;
+    const existing = (zSettings && zSettings[settingsKey]) || [];
+    if (existing.some((v) => v.toLowerCase() === trimmed.toLowerCase())) return;
+    const kindLabel = kind === "brand" ? "brand" : "description";
+    const listLabel = settingsKey === "allBrands" ? "brands" : "descriptions";
+    _setHintConfirm({
+      title: `Add ${kindLabel}?`,
+      message: `Add "${trimmed}" to the saved ${listLabel}?`,
+      onYes: () => {
+        const current = useSettingsStore.getState().settings?.[settingsKey] || [];
+        if (!current.some((v) => v.toLowerCase() === trimmed.toLowerCase())) {
+          const updated = [...current, trimmed].sort((a, b) =>
+            a.toLowerCase().localeCompare(b.toLowerCase())
+          );
+          useSettingsStore.getState().setField(settingsKey, updated);
+        }
+        _setHintConfirm(null);
+      },
+      onNo: () => _setHintConfirm(null),
+    });
+  }
 
   const brandSuggestions = sBrandFocused && zOpenWorkorder?.brand?.trim().length >= 1
     ? (zSettings.allBrands || []).filter(
@@ -381,7 +443,7 @@ export const ActiveWorkorderComponent = ({}) => {
     : [];
 
   function saveBrandToAllBrands(brand) {
-    confirmAddHint({ kind: "brand", value: brand, settingsKey: "allBrands" });
+    promptAddHint({ kind: "brand", value: brand, settingsKey: "allBrands" });
   }
 
   // Description autocomplete
@@ -398,7 +460,7 @@ export const ActiveWorkorderComponent = ({}) => {
     : [];
 
   function saveDescToAllDescriptions(desc) {
-    confirmAddHint({ kind: "description", value: desc, settingsKey: "allDescriptions" });
+    promptAddHint({ kind: "description", value: desc, settingsKey: "allDescriptions" });
   }
 
   // Part source autocomplete
@@ -552,6 +614,10 @@ export const ActiveWorkorderComponent = ({}) => {
     _setShowCustomerInfoScreen(false);
   });
 
+  const handleOpenCustomerInfo = useGatedAction(() => {
+    _setShowCustomerInfoScreen(true);
+  });
+
   function handleWorkorderPrintPress() {
     showToast("Receipt printed");
     const _settings = useSettingsStore.getState().getSettings();
@@ -655,6 +721,7 @@ export const ActiveWorkorderComponent = ({}) => {
   return (
     <div
       className={styles.container}
+      {...panelGate}
       style={{
         backgroundColor: C.backgroundWhite,
         backgroundImage:
@@ -716,7 +783,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 paddingHorizontal: 20,
                 backgroundColor: "transparent",
               }}
-              handleButtonPress={() => _setShowCustomerInfoScreen(true)}
+              handleButtonPress={handleOpenCustomerInfo}
               buttonTextStyle={{
                 fontSize: 20,
                 color: Colors.lightText,
@@ -826,7 +893,6 @@ export const ActiveWorkorderComponent = ({}) => {
                       }
                     }
                   }}
-                  onPointerDown={gate.onPointerDown}
                   onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setBrandFocused(true); brandBackspaced.current = false; brandPrevValRef.current = zOpenWorkorder?.brand || ""; }}
                   onBlur={() => {
                     setTimeout(() => {
@@ -996,7 +1062,6 @@ export const ActiveWorkorderComponent = ({}) => {
                       }
                     }
                   }}
-                  onPointerDown={gate.onPointerDown}
                   onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setDescFocused(true); descBackspaced.current = false; descPrevValRef.current = zOpenWorkorder?.description || ""; }}
                   onBlur={() => {
                     setTimeout(() => {
@@ -1147,7 +1212,6 @@ export const ActiveWorkorderComponent = ({}) => {
                         }
                       }
                     }}
-                    onPointerDown={gate.onPointerDown}
                     onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setColor1Focused(true); color1Backspaced.current = false; color1PrevValRef.current = zOpenWorkorder?.color1?.label || ""; }}
                     onBlur={() => {
                       setTimeout(() => {
@@ -1228,7 +1292,6 @@ export const ActiveWorkorderComponent = ({}) => {
                         }
                       }
                     }}
-                    onPointerDown={gate.onPointerDown}
                     onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setColor2Focused(true); color2Backspaced.current = false; color2PrevValRef.current = zOpenWorkorder?.color2?.label || ""; }}
                     onBlur={() => {
                       setTimeout(() => {
@@ -1351,8 +1414,8 @@ export const ActiveWorkorderComponent = ({}) => {
             </div>
             {(() => {
               const rs = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses);
-              const isPickupDelivery = zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery";
               const pd = zOpenWorkorder?.pickupDelivery || {};
+              const hasPickupData = !!(pd.month || pd.day || pd.startTime || pd.endTime);
 
               const handleStatusSelect = (val) => {
                 useLoginStore.getState().promptLogin().then((ok) => {
@@ -1482,45 +1545,47 @@ export const ActiveWorkorderComponent = ({}) => {
               };
 
               return (
-                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: isPickupDelivery ? "space-between" : undefined, marginTop: 11, width: "100%", boxSizing: "border-box" }}>
-                  <div style={{ display: "flex", width: isPickupDelivery ? "33%" : "100%", flexShrink: 0 }}>
-                    <DropdownMenu
-                      dataArr={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
-                      enabled={!isDonePaid}
-                      onSelect={(item) => handleStatusSelect(item)}
-                      buttonIcon={null}
-                      buttonStyle={{
-                        backgroundColor: rs.backgroundColor,
-                        borderColor: rs.backgroundColor,
-                        paddingLeft: isPickupDelivery ? 12 : 8,
-                        paddingRight: isPickupDelivery ? 12 : 8,
-                      }}
-                      buttonTextStyle={{
-                        color: rs.textColor,
-                        fontWeight: "normal",
-                        fontSize: 14,
-                      }}
-                      itemStyle={{
-                        minHeight: 40,
-                        height: 40,
-                        paddingTop: 0,
-                        paddingBottom: 0,
-                      }}
-                      itemTextStyle={{
-                        fontWeight: "500",
-                      }}
-                      itemSeparatorStyle={{ height: 0 }}
-                      menuBorderColor={"transparent"}
-                      modalCoordX={100}
-                      menuMaxHeight={"calc(100vh - 20px)"}
-                      mouseOverOptions={{ enable: true, opacity: 1 }}
-                      ref={statusRef}
-                      buttonText={(zOpenWorkorder?.status === "finished" ? (zOpenWorkorder.contacted ? "\u2713 " : "\u2717 ") : "") + rs.label}
-                      preserveItemBackground={true}
-                      matchValue={rs.label}
-                    />
+                <>
+                  <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginTop: 11, width: "100%", boxSizing: "border-box" }}>
+                    <div style={{ display: "flex", width: "100%", flexShrink: 0 }}>
+                      <DropdownMenu
+                        dataArr={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
+                        enabled={!isDonePaid}
+                        onSelect={(item) => handleStatusSelect(item)}
+                        buttonIcon={null}
+                        buttonStyle={{
+                          backgroundColor: rs.backgroundColor,
+                          borderColor: rs.backgroundColor,
+                          paddingLeft: 8,
+                          paddingRight: 8,
+                        }}
+                        buttonTextStyle={{
+                          color: rs.textColor,
+                          fontWeight: "normal",
+                          fontSize: 14,
+                        }}
+                        itemStyle={{
+                          minHeight: 40,
+                          height: 40,
+                          paddingTop: 0,
+                          paddingBottom: 0,
+                        }}
+                        itemTextStyle={{
+                          fontWeight: "500",
+                        }}
+                        itemSeparatorStyle={{ height: 0 }}
+                        menuBorderColor={"transparent"}
+                        modalCoordX={100}
+                        menuMaxHeight={"calc(100vh - 20px)"}
+                        mouseOverOptions={{ enable: true, opacity: 1 }}
+                        ref={statusRef}
+                        buttonText={(zOpenWorkorder?.status === "finished" ? (zOpenWorkorder.contacted ? "\u2713 " : "\u2717 ") : "") + rs.label}
+                        preserveItemBackground={true}
+                        matchValue={rs.label}
+                      />
+                    </div>
                   </div>
-                  {isPickupDelivery && (
+                  {hasPickupData && (
                     <PickupDeliveryInputs
                       pd={pd}
                       isDonePaid={isDonePaid}
@@ -1531,7 +1596,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       updatePickupFields={updatePickupFields}
                     />
                   )}
-                </div>
+                </>
               );
             })()}
             <div
@@ -1547,16 +1612,22 @@ export const ActiveWorkorderComponent = ({}) => {
                 boxSizing: "border-box",
               }}
             >
-              <span style={{ color: C.textMuted, fontSize: 13, marginRight: 4 }}>
-                Max wait days:
-              </span>
+              {(() => {
+                const _pd = zOpenWorkorder?.pickupDelivery || {};
+                const _hasPickupData = !!(_pd.month || _pd.day || _pd.startTime || _pd.endTime);
+                return (
+                  <span style={{ color: C.textMuted, fontSize: 12, marginRight: 4, flexShrink: 0, whiteSpace: "nowrap" }}>
+                    {_hasPickupData ? "Max wait days (in shop):" : "Max wait days:"}
+                  </span>
+                );
+              })()}
               <TextInput_
                 placeholder={"0"}
                 editable={!isDonePaid}
                 inputMode="numeric"
                 style={activeInputStyle({
                   filled: !!zOpenWorkorder?.waitTime?.label,
-                  width: 50,
+                  width: 30,
                   textAlign: "center",
                   fontWeight: (zOpenWorkorder?.waitTime?.maxWaitTimeDays != null && zOpenWorkorder?.waitTime?.maxWaitTimeDays !== "") ? "500" : null,
                   backgroundColor: sWaitTimeBlink ? "rgba(255, 255, 0, 0.35)" : "transparent",
@@ -1577,6 +1648,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <div
                 style={{
                   flex: 1,
+                  minWidth: 0,
                   display: "flex",
                   flexDirection: "row",
                   paddingLeft: 5,
@@ -1585,7 +1657,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   boxSizing: "border-box",
                 }}
               >
-                <div style={{ display: "flex", width: "100%" }}>
+                <div style={{ display: "flex", width: "100%", minWidth: 0 }}>
                   <DropdownMenu
                     modalCoordX={50}
                     dataArr={zSettings.waitTimes}
@@ -1603,8 +1675,30 @@ export const ActiveWorkorderComponent = ({}) => {
                   />
                 </div>
               </div>
+              <span style={{ color: C.textMuted, fontSize: 12, marginLeft: 6, marginRight: 4, flexShrink: 0, whiteSpace: "nowrap" }}>
+                Target:
+              </span>
+              <div style={{ display: "flex", flexShrink: 0 }}>
+                <DropdownMenu
+                  modalCoordX={50}
+                  dataArr={DAYS_OF_WEEK}
+                  enabled={!isDonePaid}
+                  onSelect={(item) => {
+                    _sSetTargetDay(item.label);
+                    const days = computeDaysUntilDay(item.id);
+                    const waitObj = {
+                      ...CUSTOM_WAIT_TIME,
+                      label: days + (days === 1 ? " Day" : " Days"),
+                      maxWaitTimeDays: days,
+                    };
+                    useOpenWorkordersStore.getState().setField("waitTime", waitObj, zOpenWorkorder.id);
+                  }}
+                  matchValue={sTargetDay}
+                  buttonText={sTargetDay || "Select"}
+                />
+              </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "row", justifyContent: "flex-end", alignItems: "center", width: "100%", marginTop: 4, boxSizing: "border-box" }}>
+            <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", width: "100%", marginTop: 4, boxSizing: "border-box" }}>
               <CheckBox
                 isChecked={!!zOpenWorkorder?.itemNotHere}
                 text="Customer item not here"
@@ -1644,7 +1738,62 @@ export const ActiveWorkorderComponent = ({}) => {
               <div style={{ flex: 1, height: 3, borderRadius: Radius.control, backgroundColor: C.surfaceAlt }} />
             </div>
             {(sShowItemOrdering || hasItemOrderingData) && (
-              <div style={{ display: "flex", flexDirection: "row", width: "100%", marginTop: 5, boxSizing: "border-box" }}>
+              <div style={{ display: "flex", flexDirection: "column", width: "100%", marginTop: 5, boxSizing: "border-box" }}>
+
+                {/* Item carousel chips — visible only when 2+ items */}
+                {(() => {
+                  const items = zOpenWorkorder?.orderedItems || [];
+                  if (items.length <= 1) return null;
+                  return (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        gap: 6,
+                        overflowX: "auto",
+                        marginBottom: 10,
+                        paddingBottom: 4,
+                        width: "100%",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {items.map((item, idx) => {
+                        const isActive = idx === sActiveOrderedIndex;
+                        const raw = (item.partOrdered || "").trim();
+                        const display = raw
+                          ? (raw.length > 18 ? raw.slice(0, 18) + "…" : raw)
+                          : `Item ${idx + 1}`;
+                        return (
+                          <button
+                            key={item.id || idx}
+                            type="button"
+                            onClick={() => handleNavigateToIndex(idx)}
+                            title={raw || `Item ${idx + 1}`}
+                            style={{
+                              flexShrink: 0,
+                              padding: "4px 10px",
+                              fontSize: 11,
+                              fontWeight: isActive ? "600" : "400",
+                              color: isActive ? C.backgroundWhite : C.text,
+                              backgroundColor: isActive ? C.orange : C.backgroundWhite,
+                              border: "1px solid",
+                              borderColor: isActive ? C.orange : C.borderSubtle,
+                              borderRadius: 12,
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                              fontFamily: "inherit",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {capitalizeFirstLetterOfString(display)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                <div style={{ display: "flex", flexDirection: "row", width: "100%", boxSizing: "border-box" }}>
 
                 {/* Fields — 87% */}
                 <div style={{ width: "87%", flexShrink: 0, paddingRight: 15, opacity: hasActiveItem ? 1 : 0.35, boxSizing: "border-box" }}>
@@ -1670,7 +1819,6 @@ export const ActiveWorkorderComponent = ({}) => {
                         borderColor: C.buttonLightGreenOutline,
                       })}
                       value={capitalizeFirstLetterOfString(sActiveOrderedItem?.partOrdered || "")}
-                      onPointerDown={gate.onPointerDown}
                       onFocus={gate.onFocus}
                       onChangeText={(val) => {
                         updateActiveItemField("partOrdered", val);
@@ -1700,7 +1848,6 @@ export const ActiveWorkorderComponent = ({}) => {
                           filled: !!sActiveOrderedItem?.partSource,
                           backgroundColor: C.backgroundWhite,
                         })}
-                        onPointerDown={gate.onPointerDown}
                         onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setPartSourceFocused(true); }}
                         onBlur={() => {
                           setTimeout(() => {
@@ -2026,16 +2173,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
                 {/* Button column — 13% */}
                 {(() => {
-                  const items = zOpenWorkorder?.orderedItems || [];
-                  const canGoRight = sActiveOrderedIndex < items.length - 1;
-                  const canGoLeft = sActiveOrderedIndex > 0;
                   const addTooltip = isDonePaid ? "Workorder is done & paid" : "Add ordered item";
-                  const rightTooltip = canGoRight
-                    ? `Next item (${sActiveOrderedIndex + 2} of ${items.length})`
-                    : items.length === 0 ? "No items yet" : "Already at last item";
-                  const leftTooltip = canGoLeft
-                    ? `Previous item (${sActiveOrderedIndex} of ${items.length})`
-                    : "Already at first item";
                   const canDelete = hasActiveItem && !isDonePaid;
                   const deleteTooltip = isDonePaid
                     ? "Workorder is done & paid"
@@ -2061,43 +2199,6 @@ export const ActiveWorkorderComponent = ({}) => {
                           />
                         </Tooltip>
                       </div>
-                      {/* Caret navigation */}
-                      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
-                        {canGoRight && (
-                          <Tooltip text={rightTooltip} position="top">
-                            <Button_
-                              icon={ICONS.caretRight}
-                              iconSize={22}
-                              onPress={handleNavigateRight}
-                              buttonStyle={{
-                                paddingLeft: 4,
-                                paddingRight: 4,
-                                paddingTop: 4,
-                                paddingBottom: 4,
-                                backgroundColor: "transparent",
-                              }}
-                              iconStyle={{ marginRight: 0 }}
-                            />
-                          </Tooltip>
-                        )}
-                        {canGoLeft && (
-                          <Tooltip text={leftTooltip} position="top">
-                            <Button_
-                              icon={ICONS.caretLeft}
-                              iconSize={22}
-                              onPress={handleNavigateLeft}
-                              buttonStyle={{
-                                paddingLeft: 4,
-                                paddingRight: 4,
-                                paddingTop: 4,
-                                paddingBottom: 4,
-                                backgroundColor: "transparent",
-                              }}
-                              iconStyle={{ marginRight: 0 }}
-                            />
-                          </Tooltip>
-                        )}
-                      </div>
                       {/* Delete button */}
                       <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", opacity: canDelete ? 1 : 0.2 }}>
                         <Tooltip text={deleteTooltip} position="top">
@@ -2121,6 +2222,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   );
                 })()}
 
+                </div>
               </div>
             )}
           </div>
@@ -2258,7 +2360,14 @@ export const ActiveWorkorderComponent = ({}) => {
         position="top-middle"
         onHide={() => _sSetToastVisible(false)}
       />
-      <AutoJumpBlocker show={autoJumpBlock.blocking} message={autoJumpBlock.message} />
+      <PanelJumpBlocker show={autoJumpBlock.blocking} message={autoJumpBlock.message} />
+      <PanelConfirm
+        show={!!sHintConfirm}
+        title={sHintConfirm?.title}
+        message={sHintConfirm?.message}
+        onYes={sHintConfirm?.onYes}
+        onNo={sHintConfirm?.onNo}
+      />
     </div>
   );
 };

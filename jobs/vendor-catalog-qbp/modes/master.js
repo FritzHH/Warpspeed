@@ -277,7 +277,6 @@ function toCanonicalItem(detail, itemKey) {
     image_url: "",
     cost: dollarsToCents(detail.dealerPrice && detail.dealerPrice.value),
     msrp: dollarsToCents(detail.msrp && detail.msrp.value),
-    category: "Item",
   };
 }
 

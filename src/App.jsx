@@ -47,6 +47,41 @@ const OrderViewerScreen = lazy(() =>
     default: m.OrderViewerScreen,
   }))
 );
+const PriceCheckScreen = lazy(() =>
+  import("./screens/phone/PriceCheckScreen/PriceCheckScreen").then((m) => ({
+    default: m.PriceCheckScreen,
+  }))
+);
+const WorkorderDetailScreen = lazy(() =>
+  import("./screens/phone/WorkorderDetailScreen").then((m) => ({
+    default: m.WorkorderDetailScreen,
+  }))
+);
+const MessagesScreen = lazy(() =>
+  import("./screens/phone/MessagesScreen").then((m) => ({
+    default: m.MessagesScreen,
+  }))
+);
+const QuickChargeScreen = lazy(() =>
+  import("./screens/phone/QuickChargeScreen").then((m) => ({
+    default: m.QuickChargeScreen,
+  }))
+);
+const ItemSearchScreen = lazy(() =>
+  import("./screens/phone/ItemSearchScreen").then((m) => ({
+    default: m.ItemSearchScreen,
+  }))
+);
+const PhotoCaptureScreen = lazy(() =>
+  import("./screens/phone/PhotoCaptureScreen").then((m) => ({
+    default: m.PhotoCaptureScreen,
+  }))
+);
+const VideoRecorderScreen = lazy(() =>
+  import("./screens/phone/VideoRecorderScreen").then((m) => ({
+    default: m.VideoRecorderScreen,
+  }))
+);
 import { HomeScreen } from "./screens/HomeScreen";
 const DatabaseViewerScreen = lazy(() =>
   import("./screens/DatabaseViewerScreen").then((m) => ({
@@ -137,38 +172,9 @@ function DashboardRoute() {
   return <BaseScreen />;
 }
 
-// Desktop: wrap PhoneScreen in a centered phone frame for previewing mobile UI
 function PhoneScreenWrapper() {
-  const deviceType = useLayoutStore((state) => state.deviceType);
-
-  if (deviceType === "desktop") {
-    return (
-      <div style={{
-        width: "100vw",
-        height: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: C.surfaceAlt,
-      }}>
-        <div style={{
-          height: "90vh",
-          aspectRatio: "9 / 19.5",
-          borderRadius: 40,
-          overflow: "hidden",
-          border: "6px solid " + C.borderSubtle,
-          backgroundColor: "white",
-          display: "flex",
-          boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
-        }}>
-          <PhoneScreen />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ width: "100%", height: "100vh", overflow: "hidden" }}>
+    <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
       <PhoneScreen />
     </div>
   );
@@ -543,7 +549,9 @@ function App() {
           element={
             <ProtectedRoute user={user}>
               <Suspense fallback={<LoadingIndicator />}>
-                <PhoneScreenWrapper />
+                <div className="phoneRoute">
+                  <PhoneScreenWrapper />
+                </div>
               </Suspense>
             </ProtectedRoute>
           }
@@ -573,6 +581,62 @@ function App() {
             element={
               <Suspense fallback={<LoadingIndicator />}>
                 <OrderViewerScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="price-check"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <PriceCheckScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="workorder/:woID"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <WorkorderDetailScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="workorder/:woID/messages"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <MessagesScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="workorder/:woID/charge"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <QuickChargeScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="workorder/:woID/items"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <ItemSearchScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="workorder/:woID/photo"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <PhotoCaptureScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="workorder/:woID/video"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <VideoRecorderScreen />
               </Suspense>
             }
           />

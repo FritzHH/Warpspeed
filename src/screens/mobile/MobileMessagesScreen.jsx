@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef, memo } from "react";
 import { useParams } from "react-router-dom";
 import { ICONS } from "../../styles";
-import { AlertBox, CheckBox, Image, TouchableOpacity } from "../../dom_components";
+import { AlertBox, CheckBox, Image, SwipeBackHint, TouchableOpacity } from "../../dom_components";
 import {
   formatPhoneWithDashes,
   formatDateTimeForReceipt,
   capitalizeFirstLetterOfString,
   calculateRunningTotals,
+  getWorkorderPaymentState,
 } from "../../utils";
 import {
   useOpenWorkordersStore,
@@ -14,13 +15,14 @@ import {
   useAlertScreenStore,
   useSettingsStore,
   useActiveSalesStore,
+  useCustMessagesStore,
 } from "../../stores";
 import {
   dbListenToCustomerMessages,
   dbUpdateMessageCanRespond,
+  dbToggleSMSForwarding,
   dbCreateTextToPayInvoice,
 } from "../../db_calls_wrapper";
-import { firestoreRead } from "../../db_calls";
 import { smsService } from "../../data_service_modules";
 import {
   ReplyOptionsBar,
@@ -29,11 +31,12 @@ import {
   buildForwardToArray,
   initialSelectedForwardIDs,
 } from "../screen_components/Options_Screen/ReplyOptionsBar";
+import { applyOptimisticThreadPatch } from "../screen_components/Options_Screen/MessageBubble";
 import { WorkorderMediaModal } from "../screen_components/modal_screens/WorkorderMediaModal";
 import { SMS_PROTO } from "../../data";
 import styles from "./MobileMessagesScreen.module.css";
 
-export function MobileMessagesScreen({ workorderID, onBack }) {
+export function MobileMessagesScreen({ workorderID, onBack, backLabel = "Back" }) {
   const params = useParams();
   const woID = workorderID || params?.id;
   const zWorkorder = useOpenWorkordersStore(
@@ -41,42 +44,85 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   );
 
   const zShowAlert = useAlertScreenStore((s) => s.showAlert);
+  const zSmsThreads = useCustMessagesStore((state) => state.getSmsThreads());
 
   const [sMessages, _setMessages] = useState([]);
   const [sNewMessage, _setNewMessage] = useState("");
   const [sSending, _setSending] = useState(false);
-  const [sCanRespond, _setCanRespond] = useState(true);
-  const [sNotifyMe, _setNotifyMe] = useState(false);
   const [sActionsOpen, _setActionsOpen] = useState(false);
   const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
   const [sSelectedForwardIDs, _setSelectedForwardIDs] = useState(() => initialSelectedForwardIDs(null));
+  const [sSwipeX, _setSwipeX] = useState(0);
+  const [sSwiping, _setSwiping] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const pendingMediaRef = useRef(null);
   const pendingActionRef = useRef(null);
+  const swipeStartRef = useRef(null);
 
   const customerPhone = zWorkorder?.customerCell;
   const customerFirst = zWorkorder?.customerFirst || "";
   const customerLast = zWorkorder?.customerLast || "";
   const customerID = zWorkorder?.customerID || "";
 
+  const cleanCustomerPhone = (customerPhone || "").replace(/\D/g, "");
+  const thread = zSmsThreads.find((t) => t.phone === cleanCustomerPhone);
+  const canRespond = thread?.canRespond !== false && thread?.canRespond !== null;
+  const currentUserID = useLoginStore.getState().getCurrentUser()?.id;
+  const forwardArr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+  const isForwarding = !!currentUserID && forwardArr.some((f) => f.userID === currentUserID);
+
   useEffect(() => {
     if (!customerPhone) return;
-    const cleanPhone = customerPhone.replace(/\D/g, "");
+    const cleanPhone = (customerPhone || "").replace(/\D/g, "");
+
+    // Phone-route defaults: both checkboxes default checked. Optimistic patch
+    // first (instant UI), fire-and-forget DB writes. Only push on fresh threads
+    // (no prior outgoing activity) so we don't override explicit user choices.
+    if (cleanPhone.length === 10) {
+      const currentUser = useLoginStore.getState().getCurrentUser();
+      const existingThread = useCustMessagesStore
+        .getState()
+        .getSmsThreads()
+        .find((t) => t.phone === cleanPhone);
+
+      if (!existingThread?.lastOutgoingMillis) {
+        applyOptimisticThreadPatch(cleanPhone, true, null);
+        dbUpdateMessageCanRespond(cleanPhone, null, true);
+
+        if (currentUser?.id && currentUser?.phone) {
+          const existingForward = Array.isArray(existingThread?.forwardTo)
+            ? existingThread.forwardTo
+            : [];
+          const alreadyForwarding = existingForward.some(
+            (f) => f.userID === currentUser.id
+          );
+          if (!alreadyForwarding) {
+            const nextForward = [
+              ...existingForward,
+              {
+                userID: currentUser.id,
+                phone: currentUser.phone,
+                first: currentUser.first || "",
+              },
+            ];
+            applyOptimisticThreadPatch(cleanPhone, undefined, nextForward);
+            dbToggleSMSForwarding(
+              cleanPhone,
+              currentUser.id,
+              true,
+              currentUser.phone,
+              currentUser.first
+            );
+          }
+        }
+      }
+    }
+
     const unsubscribe = dbListenToCustomerMessages(customerPhone, (messages) => {
       if (messages) _setMessages(messages);
     });
-    const zSettings = useSettingsStore.getState().getSettings();
-    const tenantID = zSettings?.tenantID;
-    const storeID = zSettings?.storeID;
-    if (tenantID && storeID && cleanPhone.length === 10) {
-      firestoreRead(`tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`)
-        .then((data) => {
-          if (data && data.canRespond !== undefined) _setCanRespond(!!data.canRespond);
-        })
-        .catch(() => {});
-    }
     return () => {
       if (unsubscribe) unsubscribe();
     };
@@ -100,7 +146,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   }
 
   async function handleSend() {
-    if (!sNewMessage.trim() || sSending) return;
+    if (sNewMessage.trim().length < 2 || sSending) return;
     _setSending(true);
     const currentUser = useLoginStore.getState().getCurrentUser();
     const msg = { ...SMS_PROTO };
@@ -108,16 +154,13 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     msg.phoneNumber = customerPhone;
     if (customerFirst) msg.customerFirst = customerFirst;
     if (customerLast) msg.customerLast = customerLast;
-    msg.canRespond = sCanRespond ? true : null;
+    msg.canRespond = canRespond ? true : null;
     msg.millis = new Date().getTime();
     msg.customerID = customerID;
     msg.id = crypto.randomUUID();
     msg.type = "outgoing";
     msg.senderUserObj = currentUser;
     msg.sentByUser = currentUser?.id;
-    if (sNotifyMe && currentUser?.id && currentUser?.phone) {
-      msg.forwardTo = [{ userID: currentUser.id, phone: currentUser.phone, first: currentUser.first || "" }];
-    }
     _setNewMessage("");
     if (inputRef.current) inputRef.current.style.height = "36px";
     const result = await smsService.send(msg);
@@ -144,9 +187,47 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   }
 
   async function handleToggleCanRespond() {
-    const newVal = !sCanRespond;
-    _setCanRespond(newVal);
-    await dbUpdateMessageCanRespond(customerPhone, null, newVal);
+    if (!cleanCustomerPhone || cleanCustomerPhone.length !== 10) return;
+    const newVal = !canRespond;
+    applyOptimisticThreadPatch(cleanCustomerPhone, newVal, null);
+    const currentUser = useLoginStore.getState().getCurrentUser();
+    const alsoUnforward =
+      !newVal && currentUser?.id && forwardArr.some((f) => f.userID === currentUser.id);
+    if (alsoUnforward) {
+      const nextForward = forwardArr.filter((f) => f.userID !== currentUser.id);
+      applyOptimisticThreadPatch(cleanCustomerPhone, undefined, nextForward);
+    }
+    await dbUpdateMessageCanRespond(cleanCustomerPhone, null, newVal);
+    if (alsoUnforward) {
+      await dbToggleSMSForwarding(cleanCustomerPhone, currentUser.id, false, currentUser.phone, currentUser.first);
+    }
+  }
+
+  async function handleToggleForward() {
+    if (!cleanCustomerPhone || cleanCustomerPhone.length !== 10) return;
+    const currentUser = useLoginStore.getState().getCurrentUser();
+    if (!currentUser?.phone) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Phone Number",
+        message:
+          "Your user profile does not have a phone number. Add one in settings to receive forwarded replies.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    const isCurrentlyForwarding = forwardArr.some((f) => f.userID === currentUser.id);
+    const nextForward = isCurrentlyForwarding
+      ? forwardArr.filter((f) => f.userID !== currentUser.id)
+      : [...forwardArr, { userID: currentUser.id, phone: currentUser.phone || "", first: currentUser.first || "" }];
+    const nextCanRespond = (!isCurrentlyForwarding && !canRespond) ? true : undefined;
+    applyOptimisticThreadPatch(cleanCustomerPhone, nextCanRespond, nextForward);
+    if (!isCurrentlyForwarding && !canRespond) {
+      await dbUpdateMessageCanRespond(cleanCustomerPhone, null, true);
+    }
+    await dbToggleSMSForwarding(cleanCustomerPhone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
   }
 
   function handleMediaPicked(mediaItem) {
@@ -157,7 +238,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     _setShowReplyModal(true);
     scheduleAutoSend(() => {
       _setShowReplyModal(false);
-      sendMediaMessage(sCanRespond);
+      sendMediaMessage(canRespond);
       pendingActionRef.current = null;
       pendingMediaRef.current = null;
     });
@@ -171,7 +252,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     _setShowReplyModal(true);
     scheduleAutoSend(() => {
       _setShowReplyModal(false);
-      sendMediaMessage(sCanRespond);
+      sendMediaMessage(canRespond);
       pendingActionRef.current = null;
       pendingMediaRef.current = null;
     });
@@ -182,11 +263,8 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     if (!mediaItems || !mediaItems.length) return;
     if (!customerPhone || customerPhone.replace(/\D/g, "").length !== 10) return;
     const currentUser = useLoginStore.getState().getCurrentUser();
-    const useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-    let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
-    if (!forwardTo && sNotifyMe && currentUser?.id && currentUser?.phone) {
-      forwardTo = [{ userID: currentUser.id, phone: currentUser.phone, first: currentUser.first || "" }];
-    }
+    const useCanRespond = canRespondVal !== undefined ? canRespondVal : canRespond;
+    const forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
     _setShowReplyModal(false);
     const zSettings = useSettingsStore.getState().getSettings();
     const storeName = zSettings?.storeInfo?.displayName || "Our store";
@@ -240,23 +318,6 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     pendingActionRef.current = null;
   }
 
-  function handleToggleForward() {
-    const currentUser = useLoginStore.getState().getCurrentUser();
-    if (!currentUser?.phone) {
-      useAlertScreenStore.getState().setValues({
-        title: "No Phone Number",
-        message:
-          "Your user profile does not have a phone number. Add one in settings to receive forwarded replies.",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
-      });
-      return;
-    }
-    _setNotifyMe(!sNotifyMe);
-  }
-
   function handleSendPaymentLink() {
     if (!zWorkorder.workorderLines || zWorkorder.workorderLines.length === 0) {
       useAlertScreenStore.getState().setValues({
@@ -280,34 +341,22 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
       });
       return;
     }
-    if (zWorkorder.activeSaleID) {
+    const zSettings = useSettingsStore.getState().getSettings();
+    const activeSale = zWorkorder.activeSaleID
+      ? useActiveSalesStore.getState().getActiveSale(zWorkorder.activeSaleID)
+      : null;
+    const paymentState = getWorkorderPaymentState(zWorkorder, activeSale, zSettings);
+    const amountDue = paymentState.remainingForThisWO;
+    if (amountDue <= 0) {
       useAlertScreenStore.getState().setValues({
-        title: "Active Sale In Progress",
-        message:
-          "This workorder has an active sale. Complete or cancel the sale before sending a payment link.",
+        title: "Nothing Due",
+        message: "This workorder has no balance to charge.",
         btn1Text: "OK",
         handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
         showAlert: true,
         canExitOnOuterClick: true,
       });
       return;
-    }
-    const zSettings = useSettingsStore.getState().getSettings();
-    let amountDue = 0;
-    const activeSale = zWorkorder.activeSaleID
-      ? useActiveSalesStore.getState().getActiveSale(zWorkorder.activeSaleID)
-      : null;
-    if (activeSale) {
-      amountDue = (activeSale.total || 0) - (activeSale.amountCaptured || 0);
-    } else {
-      const totals = calculateRunningTotals(
-        zWorkorder,
-        zSettings?.salesTaxPercent,
-        [],
-        false,
-        !!zWorkorder.taxFree
-      );
-      amountDue = totals.finalTotal;
     }
     const displayAmount =
       "$" +
@@ -372,26 +421,65 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     );
   }
 
-  const sendEnabled = !!sNewMessage.trim() && !sSending;
+  const sendEnabled = sNewMessage.trim().length >= 2 && !sSending;
+
+  function handleTouchStart(e) {
+    if (!onBack) return;
+    const t = e.touches[0];
+    if (t.clientX > 30) return;
+    swipeStartRef.current = { x: t.clientX, time: Date.now() };
+    _setSwiping(true);
+  }
+
+  function handleTouchMove(e) {
+    if (!swipeStartRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeStartRef.current.x;
+    if (dx > 0) _setSwipeX(dx);
+  }
+
+  function handleTouchEnd() {
+    if (!swipeStartRef.current) return;
+    const elapsed = Date.now() - swipeStartRef.current.time;
+    const velocity = sSwipeX / Math.max(elapsed, 1);
+    const commitThreshold = window.innerWidth * 0.3;
+    const isCommit = sSwipeX > commitThreshold || velocity > 0.5;
+    swipeStartRef.current = null;
+    _setSwiping(false);
+    if (isCommit && onBack) {
+      _setSwipeX(window.innerWidth);
+      setTimeout(() => {
+        onBack();
+        _setSwipeX(0);
+      }, 200);
+    } else {
+      _setSwipeX(0);
+    }
+  }
 
   return (
-    <div className={styles.root}>
+    <div
+      className={styles.root}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{
+        transform: `translateX(${sSwipeX}px)`,
+        transition: sSwiping ? "none" : "transform 200ms ease",
+      }}
+    >
+      <SwipeBackHint label="Workorder" swipeX={sSwipeX} />
       <div className={styles.header}>
-        <TouchableOpacity onPress={onBack} style={{ display: "flex", flexDirection: "row", alignItems: "center", flex: 1, padding: 4 }}>
-          {onBack ? (
-            <Image icon={ICONS.downChevron} size={16} style={{ transform: "rotate(90deg)", marginRight: 10 }} />
-          ) : null}
-          <div className={styles.headerTextWrap}>
-            <span className={styles.headerName}>
-              {capitalizeFirstLetterOfString(customerFirst) +
-                " " +
-                capitalizeFirstLetterOfString(customerLast)}
-            </span>
-            <span className={styles.headerPhone}>
-              {formatPhoneWithDashes(customerPhone)}
-            </span>
-          </div>
-        </TouchableOpacity>
+        <div className={styles.headerTextWrap}>
+          <span className={styles.headerName}>
+            {capitalizeFirstLetterOfString(customerFirst) +
+              " " +
+              capitalizeFirstLetterOfString(customerLast)}
+          </span>
+          <span className={styles.headerPhone}>
+            {formatPhoneWithDashes(customerPhone)}
+          </span>
+        </div>
       </div>
 
       <div className={styles.messagesWrap}>
@@ -418,7 +506,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
               onPress={() => _setActionsOpen(!sActionsOpen)}
               style={{ padding: 6 }}
             >
-              <Image icon={ICONS.menu2} size={22} />
+              <Image icon={ICONS.menu2} size={24} />
             </TouchableOpacity>
             {sActionsOpen ? (
               <div className={styles.menuDropdown}>
@@ -445,40 +533,32 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
             ) : null}
           </div>
           <CheckBox
-            isChecked={sNotifyMe}
-            onCheck={() => {
-              const currentUser = useLoginStore.getState().getCurrentUser();
-              if (!currentUser?.phone) {
-                useAlertScreenStore.getState().setValues({
-                  title: "No Phone Number",
-                  message:
-                    "Your user profile does not have a phone number. Add one in settings to receive forwarded replies.",
-                  btn1Text: "OK",
-                  handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-                  showAlert: true,
-                  canExitOnOuterClick: true,
-                });
-                return;
-              }
-              _setNotifyMe(!sNotifyMe);
-            }}
+            isChecked={isForwarding}
+            onCheck={handleToggleForward}
             text="Notify me"
+            iconSize={17}
+            textStyle={{ fontSize: 17 }}
           />
           <CheckBox
-            isChecked={sCanRespond}
+            isChecked={canRespond}
             onCheck={handleToggleCanRespond}
             text="User can respond"
+            iconSize={17}
+            textStyle={{ fontSize: 17 }}
           />
         </div>
         <ReplyOptionsBar
           visible={sShowReplyModal}
           hasActivePhone={!!useLoginStore.getState().getCurrentUser()?.phone}
-          onSelectCanRespond={(canRespond) => {
+          onSelectCanRespond={(nextCanRespond) => {
             clearAutoSend();
-            _setCanRespond(canRespond);
+            if (cleanCustomerPhone && cleanCustomerPhone.length === 10) {
+              applyOptimisticThreadPatch(cleanCustomerPhone, nextCanRespond, null);
+              dbUpdateMessageCanRespond(cleanCustomerPhone, null, nextCanRespond);
+            }
             _setShowReplyModal(false);
             if (pendingActionRef.current === "media") {
-              sendMediaMessage(canRespond);
+              sendMediaMessage(nextCanRespond);
             }
           }}
           selectedForwardIDs={sSelectedForwardIDs}
@@ -488,7 +568,10 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
             const users = useSettingsStore.getState().getSettings()?.users || [];
             const forwardToArray = buildForwardToArray(sSelectedForwardIDs, users);
             clearAutoSend();
-            _setCanRespond(true);
+            if (cleanCustomerPhone && cleanCustomerPhone.length === 10) {
+              applyOptimisticThreadPatch(cleanCustomerPhone, true, null);
+              dbUpdateMessageCanRespond(cleanCustomerPhone, null, true);
+            }
             _setShowReplyModal(false);
             if (pendingActionRef.current === "media") {
               sendMediaMessage(true, forwardToArray);
@@ -510,20 +593,21 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
               }
               autoResizeInput();
             }}
-            placeholder="Type a message..."
+            placeholder="Message..."
             rows={1}
             className={styles.textInput}
           />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!sendEnabled}
-            className={`${styles.sendBtn} ${
-              sendEnabled ? styles.sendBtnEnabled : styles.sendBtnDisabled
-            }`}
-          >
-            <span className={styles.sendBtnIcon}>{"\u2191"}</span>
-          </button>
+          <div className={styles.sendColumn}>
+            <TouchableOpacity
+              onPress={() => {
+                if (sendEnabled) handleSend();
+              }}
+              className={styles.sendButton}
+              style={{ opacity: sendEnabled ? 1 : 0.3 }}
+            >
+              <Image icon={ICONS.airplane} size={41} />
+            </TouchableOpacity>
+          </div>
         </div>
       </div>
       <AlertBox showAlert={zShowAlert} />

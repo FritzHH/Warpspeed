@@ -10,7 +10,9 @@ import {
   NoteHelper,
   TextInput as DomTextInput,
   Tooltip as DomTooltip,
+  Toast,
 } from "../../../dom_components";
+import { buildInventoryItemFromCatalog } from "../../../shared/inventoryImport";
 const InventoryItemModalScreen = lazy(() =>
   import("../modal_screens/InventoryItemModalScreen").then((m) => ({ default: m.InventoryItemModalScreen }))
 );
@@ -27,7 +29,13 @@ import {
   useInventoryStore,
   useLoginStore,
 } from "../../../stores";
-import { dbSaveSettingsField, dbSaveInventoryItem, dbSavePrintObj } from "../../../db_calls_wrapper";
+import {
+  dbSaveSettingsField,
+  dbSaveInventoryItem,
+  dbSavePrintObj,
+  dbLookupCatalogByBarcode,
+  dbLookupCatalogByVendorPartId,
+} from "../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 import headerStyles from "./InventoryHeader.module.css";
 import styles from "./OptionsInventory.module.css";
@@ -932,6 +940,10 @@ export function InventoryComponent({}) {
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sModalItem, _setModalItem] = useState(null);
+  const [sCatalogToast, _setCatalogToast] = useState({ visible: false, text: "" });
+  const [sImportToast, _setImportToast] = useState({ visible: false, text: "" });
+  const [sCatalogSearching, _setCatalogSearching] = useState(false);
+  const [sCatalogImportMode, _setCatalogImportMode] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [sCurrentParentID, _setCurrentParentID] = useState(null);
   const [sMenuPath, _setMenuPath] = useState([]);
@@ -1337,7 +1349,85 @@ export function InventoryComponent({}) {
 
   function handleInventoryInfoPress(item) {
     console.log("handleInventoryInfoPress:", item?.catalogName || item?.formalName, item?.id);
-    _setModalItem({ ...item });
+    useLoginStore.getState().promptLogin().then((ok) => {
+      if (!ok) return;
+      _setModalItem({ ...item });
+    });
+  }
+
+  function classifyCatalogSearchTerm(raw) {
+    const term = String(raw || "").trim();
+    if (!term) return { kind: "invalid" };
+    if (/^\d{12}$/.test(term) || /^\d{13}$/.test(term)) {
+      return { kind: "upc", term };
+    }
+    if (/^\d{6}$/.test(term)) {
+      return { kind: "vendor", vendorID: "jbi", term };
+    }
+    if (/^[A-Za-z]{2}\d{4}$/.test(term)) {
+      return { kind: "vendor", vendorID: "qbp", term: term.toUpperCase() };
+    }
+    return { kind: "invalid" };
+  }
+
+  async function handleSearchCatalogs() {
+    if (sCatalogSearching) return;
+    const classified = classifyCatalogSearchTerm(sSearchTerm);
+    if (classified.kind === "invalid") return;
+
+    let lookup = null;
+    let scannedBarcode = "";
+    let resolvedVendorId = "";
+
+    _setCatalogSearching(true);
+    if (classified.kind === "upc") {
+      _setCatalogToast({ visible: true, text: "Searching by UPC/EAN" });
+      scannedBarcode = classified.term;
+      lookup = await dbLookupCatalogByBarcode(classified.term);
+    } else {
+      resolvedVendorId = classified.vendorID;
+      lookup = await dbLookupCatalogByVendorPartId(classified.vendorID, classified.term);
+    }
+    _setCatalogSearching(false);
+
+    if (!lookup) {
+      _setCatalogToast({ visible: true, text: "Not found in catalogs" });
+      return;
+    }
+
+    // Short-circuit if the catalog hit is already in local inventory. Match by
+    // vendorId+vendorPartId first (most reliable for vendor-imported items),
+    // then by scanned UPC against primaryBarcode/barcodes[]. Avoids duplicate
+    // imports of the same vendor SKU.
+    const hitVendorId = String(lookup.vendor?.id || resolvedVendorId || "").trim();
+    const hitVendorPartId = String(lookup.catalogItem?.vendorPartId || lookup.catalogItem?.item_id || "").trim();
+    const localArr = useInventoryStore.getState().getInventoryArr();
+    let existingLocal = null;
+    if (hitVendorId && hitVendorPartId) {
+      existingLocal = localArr.find((o) =>
+        String(o.vendorId || "").trim() === hitVendorId &&
+        String(o.vendorPartId || "").trim() === hitVendorPartId
+      );
+    }
+    if (!existingLocal && scannedBarcode) {
+      existingLocal = localArr.find((o) =>
+        String(o.primaryBarcode || "").trim() === scannedBarcode ||
+        (Array.isArray(o.barcodes) && o.barcodes.some((b) => String(b || "").trim() === scannedBarcode))
+      );
+    }
+    if (existingLocal) {
+      _setCatalogToast({ visible: true, text: "Already in inventory" });
+      _setModalItem({ ...existingLocal });
+      return;
+    }
+
+    const newItem = buildInventoryItemFromCatalog(lookup.catalogItem, {
+      vendorId: lookup.vendor?.id || resolvedVendorId,
+      scannedBarcode,
+    });
+    console.log("[search-catalogs] catalog hit:", JSON.stringify({ vendor: lookup.vendor?.id, catalogItem: lookup.catalogItem, newItem }, null, 2));
+    _setCatalogImportMode(true);
+    _setModalItem(newItem);
   }
 
   function handleListPrintClick(item) {
@@ -1522,16 +1612,29 @@ export function InventoryComponent({}) {
             value={sSearchTerm}
             onChange={(e) => handleSearch(e.target.value)}
           />
+          <DomTooltip text="Vendor ID or UPC/EAN only" position="bottom">
+            <button
+              type="button"
+              className={`${headerStyles.iconBtn} ${headerStyles.catalogsBtn}`}
+              onClick={handleSearchCatalogs}
+              disabled={sCatalogSearching || classifyCatalogSearchTerm(sSearchTerm).kind === "invalid"}
+            >
+              {sCatalogSearching ? <span className={headerStyles.catalogsSpinner} /> : "Search catalogs"}
+            </button>
+          </DomTooltip>
           <DomTooltip text="New Item" position="bottom">
             <button
               type="button"
               className={`${headerStyles.iconBtn} ${headerStyles.newBtn}`}
               onClick={() => {
-                let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-                let barcode = generateEAN13Barcode();
-                newItem.id = barcode;
-                newItem.primaryBarcode = barcode;
-                _setModalItem(newItem);
+                useLoginStore.getState().promptLogin({ level: "Editor" }).then((ok) => {
+                  if (!ok) return;
+                  let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
+                  let barcode = generateEAN13Barcode();
+                  newItem.id = barcode;
+                  newItem.primaryBarcode = barcode;
+                  _setModalItem(newItem);
+                });
               }}
             >
               <img src={ICONS.new} alt="" className={headerStyles.newIcon} />
@@ -1781,12 +1884,24 @@ export function InventoryComponent({}) {
             <InventoryItemModalScreen
               key={sModalItem.id}
               item={sModalItem}
-              isNew={!!(sModalItem.id && !(sModalItem.catalogName || sModalItem.formalName))}
+              isNew={!!(sModalItem.id && !(sModalItem.catalogName || sModalItem.formalName)) || sCatalogImportMode}
+              isCatalogImport={sCatalogImportMode}
+              onImported={(imported) => {
+                const name = imported?.catalogName?.trim() || "Item";
+                const display = name.length > 60 ? `${name.slice(0, 60)}…` : name;
+                _setImportToast({ visible: true, text: `${display} added to inventory` });
+              }}
+              onChanged={() => {
+                const term = _searchTermRef.current;
+                if (!term || term.length < 2) return;
+                workerSearchInventory(term, (results) => _setSearchResults(results));
+              }}
               handleExit={() => {
                 const wasScanNotFound = _scanNotFoundRef.current;
                 const itemID = sModalItem?.id;
                 _scanNotFoundRef.current = false;
                 _setModalItem(null);
+                _setCatalogImportMode(false);
                 if (wasScanNotFound && itemID) {
                   const savedItem = useInventoryStore.getState().getInventoryItem(itemID);
                   if ((savedItem?.catalogName || savedItem?.formalName)?.trim() && useOpenWorkordersStore.getState().getOpenWorkorder()) {
@@ -1836,6 +1951,20 @@ export function InventoryComponent({}) {
         )}
       </div>
       </div>
+      <Toast
+        text={sCatalogToast.text}
+        visible={sCatalogToast.visible}
+        duration={2000}
+        position="top-right"
+        onHide={() => _setCatalogToast({ visible: false, text: "" })}
+      />
+      <Toast
+        text={sImportToast.text}
+        visible={sImportToast.visible}
+        duration={2200}
+        position="middle"
+        onHide={() => _setImportToast({ visible: false, text: "" })}
+      />
     </div>
   );
 }

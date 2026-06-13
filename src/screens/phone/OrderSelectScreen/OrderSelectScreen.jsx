@@ -2,13 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import cloneDeep from "lodash/cloneDeep";
 import { ROUTES } from "../../../routes";
-import { useLoginStore, useSettingsStore } from "../../../stores";
+import {
+  useLoginStore,
+  useSettingsStore,
+  useAlertScreenStore,
+} from "../../../stores";
 import {
   dbListenToVendorOrders,
   dbSaveVendorOrder,
+  dbDeleteVendorOrder,
 } from "../../../db_calls_wrapper";
 import { VENDOR_ORDER_PROTO } from "../../../data";
 import { generate36CharUUID, formatMillisForDisplay } from "../../../utils";
+import { ICONS } from "../../../styles";
+import { AlertBox, SwipeBackHint } from "../../../dom_components";
 import styles from "./OrderSelectScreen.module.css";
 
 export function OrderSelectScreen() {
@@ -20,10 +27,51 @@ export function OrderSelectScreen() {
   const zActiveOrderID = useSettingsStore(
     (s) => s.getSettings()?.activeVendorOrderID || "",
   );
+  const zShowAlert = useAlertScreenStore((s) => s.showAlert);
 
   const [sOrders, _setOrders] = useState([]);
   const [sOrdersReady, _setOrdersReady] = useState(false);
   const [sShowCreate, _setShowCreate] = useState(false);
+  const [sRenameOrder, _setRenameOrder] = useState(null);
+
+  const [sSwipeX, _setSwipeX] = useState(0);
+  const [sSwiping, _setSwiping] = useState(false);
+  const swipeStartRef = useRef(null);
+
+  function handleSwipeStart(e) {
+    const t = e.touches[0];
+    if (t.clientX > 30) return;
+    swipeStartRef.current = { x: t.clientX, time: Date.now() };
+    _setSwiping(true);
+  }
+  function handleSwipeMove(e) {
+    if (!swipeStartRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeStartRef.current.x;
+    if (dx > 0) _setSwipeX(dx);
+  }
+  function handleSwipeEnd() {
+    if (!swipeStartRef.current) return;
+    const elapsed = Date.now() - swipeStartRef.current.time;
+    const velocity = sSwipeX / Math.max(elapsed, 1);
+    const commitThreshold = window.innerWidth * 0.3;
+    const isCommit = sSwipeX > commitThreshold || velocity > 0.5;
+    swipeStartRef.current = null;
+    _setSwiping(false);
+    if (isCommit) {
+      _setSwipeX(window.innerWidth);
+      setTimeout(() => {
+        navigate(ROUTES.phone);
+        _setSwipeX(0);
+      }, 200);
+    } else {
+      _setSwipeX(0);
+    }
+  }
+  const swipeStyle = {
+    transform: `translateX(${sSwipeX}px)`,
+    transition: sSwiping ? "none" : "transform 200ms ease",
+  };
   // Auto-redirect should fire at most once per mount; otherwise the user can
   // never reach the list (selecting an order also writes activeVendorOrderID,
   // which would bounce them right back).
@@ -101,6 +149,44 @@ export function OrderSelectScreen() {
     navigate("/phone/ordering/" + orderID + "/view");
   }
 
+  async function handleRenameSubmit(newName) {
+    const order = sRenameOrder;
+    if (!order) return;
+    const trimmed = (newName || "").trim();
+    if (!trimmed || trimmed === order.name) {
+      _setRenameOrder(null);
+      return;
+    }
+    const updated = {
+      ...order,
+      name: trimmed,
+      lastModifiedMillis: Date.now(),
+      lastModifiedByUserID: zCurrentUser?.id || "",
+    };
+    _setRenameOrder(null);
+    await dbSaveVendorOrder(updated);
+  }
+
+  function handleDeleteOrder(order) {
+    useAlertScreenStore.getState().setValues({
+      title: "Delete Order",
+      severity: "info",
+      message: `Delete "${order.name || "this order"}"?`,
+      subMessage: "This cannot be undone.",
+      btn1Text: "Delete",
+      btn2Text: "Cancel",
+      handleBtn2Press: () =>
+        useAlertScreenStore.getState().setShowAlert(false),
+      handleBtn1Press: async () => {
+        useAlertScreenStore.getState().setShowAlert(false);
+        if (order.id === zActiveOrderID) {
+          useSettingsStore.getState().setField("activeVendorOrderID", "");
+        }
+        await dbDeleteVendorOrder(order.id);
+      },
+    });
+  }
+
   // Hold off on rendering until orders are loaded — otherwise we'd flash the
   // empty / "no orders" state before auto-redirect can decide.
   if (!sOrdersReady) {
@@ -108,19 +194,28 @@ export function OrderSelectScreen() {
   }
 
   return (
-    <div className={styles.root}>
+    <div
+      className={styles.root}
+      onTouchStart={handleSwipeStart}
+      onTouchMove={handleSwipeMove}
+      onTouchEnd={handleSwipeEnd}
+      style={swipeStyle}
+    >
+      <SwipeBackHint label="Workorders" swipeX={sSwipeX} />
+      <AlertBox showAlert={zShowAlert} />
       <div className={styles.header}>
+        <span className={styles.title}>Ordering</span>
+      </div>
+
+      <div className={styles.actionRow}>
         <button
-          className={styles.backButton}
-          onClick={() => navigate(ROUTES.phone)}
+          className={styles.priceCheckBtn}
+          onClick={() => navigate(ROUTES.phonePriceCheck)}
         >
-          ←
+          Price Check
         </button>
-        <span className={styles.title}>
-          {switchMode ? "Switch Order" : "Vendor Orders"}
-        </span>
         <button
-          className={styles.newButton}
+          className={styles.newBtn}
           onClick={() => _setShowCreate(true)}
         >
           + New
@@ -137,21 +232,59 @@ export function OrderSelectScreen() {
             : "Unknown date";
           const isActive = order.id === zActiveOrderID;
           return (
-            <button
+            <div
               key={order.id}
+              role="button"
+              tabIndex={0}
               className={styles.card}
               onClick={() => handlePickOrder(order.id)}
             >
               {isActive && (
                 <span className={styles.activeBanner}>ACTIVE</span>
               )}
-              <span className={styles.cardDate}>
-                {order.name || dateLabel}
-              </span>
-              <span className={styles.cardMeta}>
-                Started by {userName(order.createdByUserID) || "—"}
-              </span>
-            </button>
+              <div className={styles.cardRow}>
+                <div className={styles.cardTextCol}>
+                  <span className={styles.cardDate}>
+                    {order.name || dateLabel}
+                  </span>
+                  <span className={styles.cardMeta}>
+                    Started by {userName(order.createdByUserID) || "—"}
+                  </span>
+                </div>
+                <div className={styles.cardActions}>
+                  <button
+                    type="button"
+                    className={styles.cardIconBtn}
+                    aria-label="Rename order"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      _setRenameOrder(order);
+                    }}
+                  >
+                    <img
+                      src={ICONS.editPencil}
+                      alt=""
+                      className={styles.cardIconImg}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.cardIconBtn}
+                    aria-label="Delete order"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteOrder(order);
+                    }}
+                  >
+                    <img
+                      src={ICONS.trash}
+                      alt=""
+                      className={styles.cardIconImg}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
           );
         })}
 
@@ -168,6 +301,14 @@ export function OrderSelectScreen() {
         <NewOrderModal
           onCancel={() => _setShowCreate(false)}
           onCreate={handleCreateOrder}
+        />
+      )}
+
+      {sRenameOrder && (
+        <RenameOrderModal
+          order={sRenameOrder}
+          onCancel={() => _setRenameOrder(null)}
+          onSubmit={handleRenameSubmit}
         />
       )}
     </div>
@@ -235,6 +376,71 @@ function NewOrderModal({ onCancel, onCreate }) {
             onClick={handleSubmit}
           >
             Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RenameOrderModal({ order, onCancel, onSubmit }) {
+  const [sName, _setName] = useState(order?.name || "");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, []);
+
+  function handleSubmit() {
+    const trimmed = sName.trim();
+    if (!trimmed) return;
+    onSubmit(trimmed);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      onCancel();
+    }
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={onCancel}>
+      <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+        <span className={styles.modalTitle}>Rename Order</span>
+        <label className={styles.modalLabel} htmlFor="renameOrderName">
+          Order Name
+        </label>
+        <input
+          id="renameOrderName"
+          ref={inputRef}
+          type="text"
+          className={styles.modalInput}
+          value={sName}
+          onChange={(e) => _setName(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        <div className={styles.modalButtons}>
+          <button
+            type="button"
+            className={styles.modalCancelBtn}
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={styles.modalCreateBtn}
+            disabled={!sName.trim()}
+            onClick={handleSubmit}
+          >
+            Save
           </button>
         </div>
       </div>

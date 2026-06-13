@@ -299,7 +299,10 @@ export const DISCOUNT_OBJ_PROTO = {
   id: "",
   newPrice: 0,
   savings: 0,
-  custom: false
+  custom: false,
+  // perItem only meaningful for dollar discounts. false (default) = flat deduction
+  // off the line subtotal (price * qty); true = value * qty (per-unit deduction).
+  perItem: false,
 };
 
 export const TRANSACTION_PROTO = {
@@ -537,7 +540,7 @@ export const CUSTOMER_PREVIEW_PROTO = {
 export const VENDOR_CATALOGS = [
   {
     id: "jbi",
-    displayName: "J&B Importers",
+    displayName: "JBI",
     catalogPath: "vendor_catalogs/jbi",
     color: "blue",
     accountNumber: "", // TODO: surface on desktop split-view; not necessary yet
@@ -589,6 +592,7 @@ export const INVENTORY_ITEM_PROTO = {
   vendorId: "", // vendor id, example "jbi"
   category: "Labor", // vendor catalogs need to change this to "Item"
   alternateVendors: [], // example: { vendorId: "qbp", vendorPartId: "CH4093" }
+  specs: {}, // vendor-supplied labeled specs, e.g. { "Hub Color": "Blk", "Spoke Type": "SS 2.0 BK" }
   // on inventory item creation
 
   // app-specific needs
@@ -603,8 +607,6 @@ export const INVENTORY_ITEM_PROTO = {
 
   // to be depracated
   vendorName: "", // will depracate
-  formalName: "", // will depracate
-  informalName: "", // deprecated — read-only fallback for snapshots written before quickButtonLabel migration
 };
 
 // Vendor order = a purchase order being built (phone scanner + desktop polish).

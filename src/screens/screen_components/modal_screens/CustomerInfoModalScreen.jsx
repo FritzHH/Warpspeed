@@ -305,27 +305,25 @@ export const CustomerInfoScreenModalComponent = ({
   };
 
   function saveField(fieldName, val) {
-    useLoginStore.getState().requireLogin(() => {
-      _setCustomerInfo((prev) => {
-        const updated = { ...prev, [fieldName]: val };
-        if (!isNewCustomer) {
-          if (isCurrentCustomer) {
-            useCurrentCustomerStore.getState().setCustomerField(fieldName, val, prev.id);
-          }
-          dbSaveCustomer(updated);
-
-          const woField = CUSTOMER_TO_WORKORDER_FIELDS[fieldName];
-          if (woField) {
-            const allWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
-            allWOs
-              .filter((wo) => wo.customerID === prev.id)
-              .forEach((wo) => {
-                useOpenWorkordersStore.getState().setField(woField, val, wo.id);
-              });
-          }
+    _setCustomerInfo((prev) => {
+      const updated = { ...prev, [fieldName]: val };
+      if (!isNewCustomer) {
+        if (isCurrentCustomer) {
+          useCurrentCustomerStore.getState().setCustomerField(fieldName, val, prev.id);
         }
-        return updated;
-      });
+        dbSaveCustomer(updated);
+
+        const woField = CUSTOMER_TO_WORKORDER_FIELDS[fieldName];
+        if (woField) {
+          const allWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+          allWOs
+            .filter((wo) => wo.customerID === prev.id)
+            .forEach((wo) => {
+              useOpenWorkordersStore.getState().setField(woField, val, wo.id);
+            });
+        }
+      }
+      return updated;
     });
   }
 
@@ -600,7 +598,7 @@ export const CustomerInfoScreenModalComponent = ({
             ) : sCellEditing ? (
               <div className={styles.cellInlineRow}>
                 <TextInput
-                  onChangeText={(val) => {
+                        onChangeText={(val) => {
                     val = removeDashesFromPhone(val);
                     if (val.length > 10) return;
                     _sCellEditValue(val);
@@ -616,27 +614,39 @@ export const CustomerInfoScreenModalComponent = ({
                   }}
                   value={formatPhoneWithDashes(sCellEditValue)}
                 />
-                {sCellEditValue.replace(/\D/g, "").length === 10 && sCellDuplicateStatus !== "duplicate" ? (
-                  <Tooltip text="Save new phone number" position="top">
-                    <Button
-                      icon={ICONS.check1}
-                      iconSize={18}
-                      onPress={handleCellSavePress}
-                      buttonStyle={{
-                        paddingLeft: 4,
-                        paddingRight: 4,
-                        paddingTop: 4,
-                        paddingBottom: 4,
-                        backgroundColor: "transparent",
-                      }}
-                      iconStyle={{ marginRight: 0 }}
-                    />
-                  </Tooltip>
-                ) : null}
+                {(() => {
+                  const cleaned = sCellEditValue.replace(/\D/g, "");
+                  const cleanedOriginal = (sCustomerInfo.customerCell || "").replace(/\D/g, "");
+                  const saveEnabled =
+                    cleaned.length === 10 &&
+                    cleaned !== cleanedOriginal &&
+                    sCellDuplicateStatus !== "duplicate" &&
+                    sCellDuplicateStatus !== "error" &&
+                    sCellDuplicateStatus !== "checking";
+                  return (
+                    <Tooltip text="Save new phone number" position="top">
+                      <Button
+                        icon={ICONS.greenCheck}
+                        iconSize={18}
+                        enabled={saveEnabled}
+                        onPress={handleCellSavePress}
+                        buttonStyle={{
+                          paddingLeft: 4,
+                          paddingRight: 4,
+                          paddingTop: 4,
+                          paddingBottom: 4,
+                          marginLeft: 6,
+                          backgroundColor: "transparent",
+                        }}
+                        iconStyle={{ marginRight: 0 }}
+                      />
+                    </Tooltip>
+                  );
+                })()}
                 <Tooltip text="Cancel" position="top">
                   <Button
-                    icon={ICONS.close1}
-                    iconSize={16}
+                    icon={ICONS.redx}
+                    iconSize={18}
                     onPress={handleCellEditCancel}
                     buttonStyle={{
                       paddingLeft: 4,
@@ -652,7 +662,7 @@ export const CustomerInfoScreenModalComponent = ({
               </div>
             ) : (
               <TextInput
-                onChangeText={(val) => {
+                    onChangeText={(val) => {
                   val = removeDashesFromPhone(val);
                   if (val.length > 10) return;
                   saveField("customerCell", val);
@@ -702,14 +712,14 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <div className={styles.unitCityRow}>
             <TextInput
-              onChangeText={(val) => saveField("unit", val)}
+                onChangeText={(val) => saveField("unit", val)}
               placeholder="Unit"
               className={styles.input}
               style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "24%", height: "100%" }}
               value={sCustomerInfo.unit}
             />
             <TextInput
-              onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
+                onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
               placeholder="City"
               className={styles.input}
               style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "70%", height: "100%" }}
@@ -727,7 +737,7 @@ export const CustomerInfoScreenModalComponent = ({
 
           <div className={styles.zipMapsRow}>
             <TextInput
-              onChangeText={(val) => {
+                onChangeText={(val) => {
                 if (!checkInputForNumbersOnly(val)) return;
                 saveField("zip", val);
               }}

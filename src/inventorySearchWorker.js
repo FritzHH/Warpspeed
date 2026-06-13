@@ -114,9 +114,14 @@ function searchInventory(query, items) {
     { key: "brand", weight: 1.0 },
     { key: "category", weight: 1.0 },
     { key: "quickButtonLabel", weight: 1.0 },
+    { key: "vendorPartId", weight: 1.0 },
   ];
 
-  const ID_FIELDS = ["id", "primaryBarcode"];
+  const ID_FIELDS = ["id", "primaryBarcode", "vendorPartId"];
+
+  // Identifier-shaped queries (no spaces + contains a digit) skip Tier 5 fuzzy
+  // so digit-heavy queries don't pick up fuzzy noise on text fields.
+  const skipFuzzy = !/\s/.test(queryNorm) && /\d/.test(queryNorm);
 
   function scoreTerm(term, fieldVal) {
     if (!fieldVal) return 0;
@@ -137,7 +142,7 @@ function searchInventory(query, items) {
       return 0.75 + positionBonus;
     }
 
-    if (term.length >= 3) {
+    if (term.length >= 3 && !skipFuzzy) {
       let bestFuzzy = 0;
       for (const word of words) {
         if (word.length < 2) continue;
@@ -167,6 +172,11 @@ function searchInventory(query, items) {
     if (Array.isArray(item.barcodes)) {
       for (const bc of item.barcodes) {
         if (norm(bc) === queryNoSpaces) return 0.95;
+      }
+    }
+    if (Array.isArray(item.alternateVendors)) {
+      for (const av of item.alternateVendors) {
+        if (av && norm(av.vendorPartId) === queryNoSpaces) return 0.95;
       }
     }
     if (/^\d{4,}$/.test(queryNoSpaces)) {

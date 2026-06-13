@@ -7,7 +7,7 @@ import { takeId, getId } from "./idPool";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
-  PRINT_OBJECT_REMOVAL_DELAY,
+  PRINT_JOB_TIMEOUT_MS,
   build_db_path,
 } from "./constants";
 import {
@@ -19,6 +19,7 @@ import {
   rdbRead,
   rdbCatalogRead,
   firestoreCatalogQuery,
+  firestoreCatalogRead,
   firestoreSubscribe,
   firestoreSubscribeCollection,
   firestoreDelete,
@@ -53,6 +54,8 @@ import {
   gmailGetAttachment,
   gmailDisconnect,
   gmailReconnectWatch,
+  roadCallInitiate,
+  roadCallCancel,
 } from "./db_calls";
 import { removeUnusedFields, createNewWorkorder, buildWorkorderNumberFromId } from "./utils";
 import { useSettingsStore, useLoginStore, useOpenWorkordersStore, useInventoryStore, clearPersistedStores } from "./stores";
@@ -114,6 +117,28 @@ function buildSettingsPath(tenantID, storeID) {
  */
 function buildPhoneConfigPath(tenantID, storeID) {
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PHONE_CONFIG}/main`;
+}
+
+// Path: tenants/{tenantID}/stores/{storeID}/call-expectations
+function buildCallExpectationsCollectionPath(tenantID, storeID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/call-expectations`;
+}
+
+function buildCallExpectationPath(tenantID, storeID, customerE164) {
+  return `${buildCallExpectationsCollectionPath(tenantID, storeID)}/${customerE164}`;
+}
+
+// Same E.164 normalization used server-side in road-voice.js so the doc IDs
+// stay aligned between client writes and the inbound webhook lookup.
+function normalizeToE164ForRoadCall(raw) {
+  let s = String(raw || "").trim();
+  const hasPlus = s.startsWith("+");
+  s = s.replace(/\D/g, "");
+  if (!s) return "";
+  if (hasPlus) return `+${s}`;
+  if (s.length === 11 && s.startsWith("1")) return `+${s}`;
+  if (s.length === 10) return `+1${s}`;
+  return "";
 }
 
 /**
@@ -594,6 +619,162 @@ export async function dbSavePhoneConfig(phoneConfig) {
   } catch (error) {
     log("Error saving phone-config:", error);
     return { success: false, error: "Database Error", message: error.message };
+  }
+}
+
+// ============================================================================
+// ROAD CALLING (Bonita on-the-road number)
+// ============================================================================
+
+// Initiate an outbound bridged call: Twilio rings the logged-in user's
+// personal cell, then dials the customer with caller ID set to the road
+// number. Server also writes the call-expectations doc so a callback
+// within the window routes back to the same user.
+export async function dbInitiateRoadCall({ customerPhone, customerName, customerID } = {}) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      return { success: false, error: "tenantID/storeID not configured" };
+    }
+    const currentUser = useLoginStore.getState().currentUser;
+    const userID = currentUser?.id;
+    if (!userID) {
+      return { success: false, error: "No user logged in" };
+    }
+    const customerE164 = normalizeToE164ForRoadCall(customerPhone);
+    if (!customerE164) {
+      return { success: false, error: "Invalid customer phone" };
+    }
+    const result = await roadCallInitiate({
+      tenantID,
+      storeID,
+      userID,
+      customerPhone: customerE164,
+      customerName: customerName || "",
+      customerID: customerID || "",
+    });
+    return result;
+  } catch (error) {
+    log("Error in dbInitiateRoadCall:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Abort an in-flight outbound road call by SID (Twilio API "canceled"
+// status update). Also clears the matching call-expectation doc.
+export async function dbCancelRoadCall({ callSid, customerPhone } = {}) {
+  try {
+    if (!callSid) return { success: false, error: "callSid required" };
+    const { tenantID, storeID } = getTenantAndStore();
+    const result = await roadCallCancel({
+      tenantID: tenantID || "",
+      storeID: storeID || "",
+      callSid,
+      customerPhone: customerPhone || "",
+    });
+    return result;
+  } catch (error) {
+    log("Error in dbCancelRoadCall:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Manual "EXPECT CALLBACK" — write an expectation doc directly so an
+// unsolicited inbound from this customer routes to the current user.
+export async function dbSetCallExpectation({ customerPhone, customerName, customerID, durationMs } = {}) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      return { success: false, error: "tenantID/storeID not configured" };
+    }
+    const currentUser = useLoginStore.getState().currentUser;
+    const userID = currentUser?.id;
+    const userCell = normalizeToE164ForRoadCall(currentUser?.phone);
+    if (!userID || !userCell) {
+      return { success: false, error: "Current user has no cell on file" };
+    }
+    const customerE164 = normalizeToE164ForRoadCall(customerPhone);
+    if (!customerE164) {
+      return { success: false, error: "Invalid customer phone" };
+    }
+    const now = Date.now();
+    const window = Number.isFinite(durationMs) ? durationMs : 30 * 60 * 1000;
+    const expectation = {
+      userID,
+      userCell,
+      customerPhone: customerE164,
+      customerName: customerName || "",
+      customerID: customerID || "",
+      setBy: "manual",
+      setAt: now,
+      expiresAt: now + window,
+    };
+    const path = buildCallExpectationPath(tenantID, storeID, customerE164);
+    await firestoreWrite(path, expectation);
+    return { success: true, expectation };
+  } catch (error) {
+    log("Error in dbSetCallExpectation:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Cancel an expectation (manual clear from the banner).
+export async function dbClearCallExpectation(customerPhone) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      return { success: false, error: "tenantID/storeID not configured" };
+    }
+    const customerE164 = normalizeToE164ForRoadCall(customerPhone);
+    if (!customerE164) {
+      return { success: false, error: "Invalid customer phone" };
+    }
+    const path = buildCallExpectationPath(tenantID, storeID, customerE164);
+    await firestoreDelete(path);
+    return { success: true };
+  } catch (error) {
+    log("Error in dbClearCallExpectation:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Live listener for the whole call-expectations collection. Caller filters
+// expired/own-user client-side (collection is small — at most a handful
+// of active docs at a time).
+export function dbListenToCallExpectations(onSnapshot, onError) {
+  const name = "callExpectations";
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbListenToCallExpectations");
+      return null;
+    }
+    if (!onSnapshot || typeof onSnapshot !== "function") {
+      log("Error: onSnapshot callback function is required for dbListenToCallExpectations");
+      return null;
+    }
+    const collectionPath = buildCallExpectationsCollectionPath(tenantID, storeID);
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(
+      collectionPath,
+      (data, error, meta) => {
+        if (error) {
+          log("Call-expectations listener error", { tenantID, storeID, error });
+          if (onError) onError(error);
+          return;
+        }
+        __logListenerEmit(name, meta);
+        onSnapshot(data || []);
+      }
+    );
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up call-expectations listener:", error);
+    if (onError) onError(error);
+    return null;
   }
 }
 
@@ -1797,6 +1978,7 @@ export async function dbSavePrintObj(printObj, printerID) {
     }
 
     printObj.timestamp = Date.now();
+    printObj.status = "pending";
     const path = buildPrintObjectPath(
       tenantID,
       storeID,
@@ -1809,40 +1991,11 @@ export async function dbSavePrintObj(printObj, printerID) {
 
     const result = await firestoreWrite(path, stringifiedPrintObj);
 
-    if (result && result.success) {
-      // Set timer to remove the print object after 100ms
-      setTimeout(async () => {
-        try {
-          let deleteResult;
-          // if (!printObj.persistFlag) {
-          deleteResult = await firestoreDelete(path);
-          // }
-
-          if (deleteResult.success) {
-          } else {
-          }
-        } catch (error) {
-          log(
-            `Error in timer removal of print object with ID: ${printObj.id}:`,
-            error
-          );
-        }
-      }, PRINT_OBJECT_REMOVAL_DELAY);
-
-      return {
-        success: true,
-        message: "Print object saved successfully",
-        printObj: printObj,
-        printerID: printerID,
-        tenantID,
-        storeID,
-        path,
-      };
-    } else {
-      log(`Error saving print object: ${result.error}`);
+    if (!result || !result.success) {
+      log(`Error saving print object: ${result && result.error}`);
       return {
         success: false,
-        error: result.error,
+        error: result && result.error,
         message: "Failed to save print object",
         printObj: null,
         printerID: null,
@@ -1851,6 +2004,49 @@ export async function dbSavePrintObj(printObj, printerID) {
         path,
       };
     }
+
+    // Wait for the print agent's verdict. Contract:
+    //   success → agent deletes the doc (doc-gone is the success signal)
+    //   failure → agent sets status: "failed" + error
+    //   timeout → we delete and treat as failure (agent offline / no response)
+    const outcome = await new Promise((resolve) => {
+      let settled = false;
+      const unsubscribe = firestoreSubscribe(path, (data) => {
+        if (settled) return;
+        if (data === null) {
+          settled = true;
+          clearTimeout(timeoutHandle);
+          unsubscribe();
+          resolve({ success: true });
+        } else if (data.status === "failed") {
+          settled = true;
+          clearTimeout(timeoutHandle);
+          unsubscribe();
+          firestoreDelete(path);
+          resolve({ success: false, error: data.error || "Print failed" });
+        }
+      });
+      const timeoutHandle = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        unsubscribe();
+        firestoreDelete(path);
+        resolve({ success: false, error: "Print job timed out" });
+      }, PRINT_JOB_TIMEOUT_MS);
+    });
+
+    return {
+      success: outcome.success,
+      error: outcome.error,
+      message: outcome.success
+        ? "Print job completed"
+        : `Print job failed: ${outcome.error}`,
+      printObj,
+      printerID,
+      tenantID,
+      storeID,
+      path,
+    };
   } catch (error) {
     log("Error in dbSavePrintObj:", error.message);
 
@@ -5353,6 +5549,103 @@ export async function dbResolveOrderItem(orderID, item) {
   } catch (error) {
     log("Error resolving order item:", error);
     return { success: false, error };
+  }
+}
+
+// Read-only catalog lookup by single barcode. No DB writes, no side effects.
+// Used by Price Check on local-inventory miss to decide whether the scanned
+// code maps to a vendor catalog item we could import. Returns the first hit
+// across queryable VENDOR_CATALOGS (parallel array-contains queries), or
+// null when no vendor knows the code.
+export async function dbLookupCatalogByBarcode(scannedBarcode) {
+  try {
+    const scanned = String(scannedBarcode || "").trim();
+    if (!scanned) return null;
+
+    const queryable = VENDOR_CATALOGS.filter((v) => v.catalogPath);
+    if (queryable.length === 0) return null;
+
+    const results = await Promise.all(
+      queryable.map(async (vendor) => {
+        try {
+          const hits = await firestoreCatalogQuery(
+            `${vendor.catalogPath}/items_by_id`,
+            [{ field: "barcodes", operator: "array-contains", value: scanned }],
+            { limit: 1 },
+          );
+          if (hits.length === 0) return null;
+          const { id: _id, ...catalogItem } = hits[0];
+          return { vendor, catalogItem };
+        } catch (e) {
+          log("Catalog lookup failed for vendor " + vendor.id, e?.message);
+          return null;
+        }
+      }),
+    );
+
+    return results.find(Boolean) || null;
+  } catch (error) {
+    log("Error looking up catalog by barcode:", error);
+    return null;
+  }
+}
+
+// Read-only catalog lookup by vendor SKU, vendor known. Direct doc-get on
+// `vendor_catalogs/{vendor}/items_by_id/{vendorPartId}` (doc ID IS the SKU,
+// so no index needed). Returns { vendor, catalogItem } or null.
+export async function dbLookupCatalogByVendorPartId(vendorID, vendorPartId) {
+  try {
+    const sku = String(vendorPartId || "").trim();
+    if (!sku) return null;
+
+    const vendor = VENDOR_CATALOGS.find((v) => v.id === vendorID);
+    if (!vendor?.catalogPath) return null;
+
+    const raw = await firestoreCatalogRead(
+      `${vendor.catalogPath}/items_by_id/${sku}`,
+    );
+    if (!raw) return null;
+    const { id: _id, ...catalogItem } = raw;
+    return { vendor, catalogItem };
+  } catch (error) {
+    log("Error looking up catalog by vendor part id:", error);
+    return null;
+  }
+}
+
+// Read-only catalog lookup by vendor SKU when the owning vendor is unknown.
+// Fans out parallel direct doc-gets across every queryable VENDOR_CATALOGS
+// entry. Returns the first { vendor, catalogItem } hit, or null. SKU
+// collisions across vendors are rare but possible; first responder wins —
+// callers that need disambiguation should use the single-vendor variant.
+export async function dbLookupCatalogByVendorPartIdAnyVendor(vendorPartId) {
+  try {
+    const sku = String(vendorPartId || "").trim();
+    if (!sku) return null;
+
+    const queryable = VENDOR_CATALOGS.filter((v) => v.catalogPath);
+    if (queryable.length === 0) return null;
+
+    const results = await Promise.all(
+      queryable.map(async (vendor) => {
+        try {
+          const raw = await firestoreCatalogRead(
+            `${vendor.catalogPath}/items_by_id/${sku}`,
+          );
+          if (!raw) return null;
+          const { id: _id, ...catalogItem } = raw;
+          return { vendor, catalogItem };
+        } catch (e) {
+          log("Catalog SKU lookup failed for vendor " + vendor.id, e?.message);
+          return null;
+        }
+      }),
+    );
+
+    return results.find(Boolean) || null;
+  } catch (error) {
+    log("Error looking up catalog by vendor part id (any vendor):", error);
+    return null;
   }
 }
 

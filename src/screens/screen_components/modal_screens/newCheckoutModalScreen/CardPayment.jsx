@@ -22,7 +22,7 @@ const STRIPE_ELEMENT_STYLE = {
   },
   invalid: { color: "#e53e3e" },
 };
-const STRIPE_ELEMENT_OPTIONS = { style: STRIPE_ELEMENT_STYLE };
+const STRIPE_ELEMENT_OPTIONS = { style: STRIPE_ELEMENT_STYLE, disableLink: true };
 
 function CardPaymentForm({
   amountLeftToPay = 0,

@@ -108,6 +108,24 @@
   object-fit: contain;
 }
 
+.limitBanner {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--danger);
+  padding: 8px 16px;
+  border-radius: var(--radius-row);
+  z-index: 3;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.limitBannerText {
+  color: var(--text-on-accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .startingOverlay {
   position: absolute;
   display: flex;
@@ -163,28 +181,53 @@
 }
 
 .previewActions {
+  position: absolute;
+  bottom: 65px;
+  left: 0;
+  right: 0;
   display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: center;
+  z-index: 2;
 }
 
 .reRecordBtn {
-  padding: 12px 20px;
-  border-radius: var(--radius-row);
-  background-color: rgba(255, 255, 255, 0.2);
-  margin-right: 16px;
+  width: 44px;
+  height: 44px;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .useBtn {
-  padding: 12px 20px;
-  border-radius: var(--radius-row);
+  width: 44px;
+  height: 44px;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   cursor: pointer;
   flex-shrink: 0;
-  background-color: var(--accent);
+  margin-left: 51px;
+}
+
+.bottomCloseBtn {
+  width: 44px;
+  height: 44px;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 51px;
 }
 
 .btnText {

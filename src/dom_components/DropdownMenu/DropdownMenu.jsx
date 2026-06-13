@@ -9,6 +9,8 @@ import { useZ } from "../../hooks/useZ";
 const VIEWPORT_PAD = 10;
 const SYSTEM_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif';
 
+let dropdownCrossCloseLockUntil = 0;
+
 const CustomDiscountInput = ({ label, onApply, maxLength = 3, maxVal, currencyMode = false, maxCents = 0 }) => {
   const [val, setVal] = useState("");
   const [cents, setCents] = useState(0);
@@ -65,6 +67,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     onSelect,
     open: openProp,
     onOpenChange,
+    beforePress,
     buttonIcon,
     buttonIconSize,
     itemTextStyle = {},
@@ -116,6 +119,21 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     close: () => setOpen(false),
     toggle: () => { if (!isOpen) calcPosition(); setOpen(!isOpen); },
   }));
+
+  async function requestOpen(toggleMode = false) {
+    if (isDisabled) return;
+    if (Date.now() < dropdownCrossCloseLockUntil) {
+      dropdownCrossCloseLockUntil = 0;
+      return;
+    }
+    const willOpen = toggleMode ? !isOpen : true;
+    if (willOpen && beforePress) {
+      const ok = await beforePress();
+      if (!ok) return;
+    }
+    calcPosition();
+    setOpen(willOpen);
+  }
 
   function calcPosition() {
     if (!anchorRef.current) return;
@@ -207,25 +225,48 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
 
   useEffect(() => {
     if (!isOpen) return;
-    const onPointerDown = (e) => {
+
+    const isInsideMenu = (t) =>
+      !!(menuRef.current && menuRef.current.contains(t));
+    const isInsideAnchor = (t) =>
+      !!(anchorRef.current && anchorRef.current.contains(t));
+
+    // Capture-phase dismissal: any outside tap is fully consumed (no focus,
+    // no nav, no click-through), then the menu closes. Inside-menu pointerdowns
+    // still get bubble-phase stopped so Radix's DismissableLayer doesn't block
+    // input focus inside portaled menu content.
+    const onCapture = (e) => {
       const t = e.target;
-      if (anchorRef.current && anchorRef.current.contains(t)) return;
-      if (menuRef.current && menuRef.current.contains(t)) return;
-      setOpen(false);
-    };
-    // Capture-phase listener: stop pointerdowns inside the menu from reaching
-    // Radix's DismissableLayer handler (which calls preventDefault on outside
-    // events and blocks input focus inside portaled menu content).
-    const onPointerDownCapture = (e) => {
-      if (menuRef.current && menuRef.current.contains(e.target)) {
-        e.stopPropagation();
+
+      if (isInsideMenu(t)) {
+        if (e.type === "pointerdown") e.stopPropagation();
+        return;
+      }
+      if (isInsideAnchor(t)) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === "function") {
+        e.stopImmediatePropagation();
+      }
+
+      if (e.type === "pointerdown") {
+        if (t && t.closest && t.closest('[role="combobox"]')) {
+          dropdownCrossCloseLockUntil = Date.now() + 250;
+        }
+        setOpen(false);
       }
     };
-    document.addEventListener("pointerdown", onPointerDownCapture, true);
-    document.addEventListener("pointerdown", onPointerDown);
+
+    const types = [
+      "pointerdown", "pointerup",
+      "mousedown", "mouseup", "click",
+      "touchstart", "touchend",
+    ];
+    const opts = { capture: true, passive: false };
+    types.forEach((t) => document.addEventListener(t, onCapture, opts));
     return () => {
-      document.removeEventListener("pointerdown", onPointerDownCapture, true);
-      document.removeEventListener("pointerdown", onPointerDown);
+      types.forEach((t) => document.removeEventListener(t, onCapture, opts));
     };
   }, [isOpen]);
 
@@ -263,7 +304,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
         ref={anchorRef}
         className={`${styles.trigger} ${displayText ? styles.triggerHasText : ""} ${isDisabled ? styles.disabled : ""} ${className} ${buttonClassName}`}
         style={triggerStyle}
-        onClick={() => { if (!isDisabled) { calcPosition(); setOpen(!isOpen); } }}
+        onClick={() => requestOpen(true)}
         role="combobox"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
@@ -274,8 +315,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
         onKeyDown={(e) => {
           if (!isDisabled && (e.key === "Enter" || e.key === " " || e.key === "ArrowDown")) {
             e.preventDefault();
-            calcPosition();
-            setOpen(true);
+            requestOpen(false);
           }
         }}
       >

@@ -4,6 +4,7 @@ import { storageUpload } from "../../../../../db_calls";
 import { build_db_path } from "../../../../../constants";
 import { PHONE_CONFIG_OBJ } from "../../../../../data";
 import { log } from "../../../../../utils";
+import { TextInput } from "../../../../../dom_components";
 import styles from "./PhoneSettingsComponent.module.css";
 
 const OVERRIDE_OPTIONS = [
@@ -259,9 +260,19 @@ const GreetingEditor = ({
   const settings = useSettingsStore((s) => s.settings);
   const fileInputRef = useRef(null);
   const [sUploading, _sSetUploading] = useState(false);
+  const [sDraftText, _sSetDraftText] = useState(null);
 
   const g = greeting || { type: "text", text: "", audioURL: "", audioPath: "" };
   const type = g.type || "text";
+  const savedText = g.text || "";
+  const displayText = sDraftText !== null ? sDraftText : savedText;
+  const isDirty = sDraftText !== null && sDraftText !== savedText;
+
+  const handleSaveText = () => {
+    if (!isDirty) return;
+    onChange({ text: sDraftText });
+    _sSetDraftText(null);
+  };
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -293,7 +304,19 @@ const GreetingEditor = ({
 
   return (
     <div className={styles.greetingCard}>
-      <div className={styles.greetingTitle}>{title}</div>
+      <div className={styles.greetingTitleRow}>
+        <div className={styles.greetingTitle}>{title}</div>
+        <button
+          type="button"
+          className={`${styles.saveBtn} ${
+            isDirty ? styles.saveBtnEnabled : styles.saveBtnDisabled
+          }`}
+          onClick={handleSaveText}
+          disabled={!isDirty}
+        >
+          Save
+        </button>
+      </div>
       <div className={styles.greetingSubtitle}>{subtitle}</div>
 
       <div className={styles.typeToggleRow}>
@@ -320,11 +343,14 @@ const GreetingEditor = ({
       </div>
 
       {type === "text" && (
-        <textarea
+        <TextInput
+          multiline={true}
+          numberOfLines={4}
+          debounceMs={0}
           className={styles.textArea}
-          value={g.text || ""}
+          value={displayText}
           placeholder="Type the message that will be read to the caller…"
-          onChange={(e) => onChange({ text: e.target.value })}
+          onChangeText={(val) => _sSetDraftText(val)}
         />
       )}
 

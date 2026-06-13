@@ -229,6 +229,8 @@
   border-width: 1px;
   border-style: solid;
   padding: 3px 10px;
+  min-width: 44px;
+  text-align: center;
   cursor: pointer;
   user-select: none;
   background: none;

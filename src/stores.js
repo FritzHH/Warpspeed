@@ -467,7 +467,7 @@ let _alertIdCounter = 0;
 function _normalizeSeverity(severity) {
   if (severity === "danger") return "warning";
   if (severity === "info" || severity === "warning") return severity;
-  return "warning";
+  return "info";
 }
 
 export const useAlertScreenStore = create((set, get) => ({
@@ -1532,8 +1532,8 @@ export function broadcastFullWorkorderToDisplay(wo) {
 
 // changelog helpers /////////////////////////////////////////////////////
 const NEWLY_CREATED_STATUS_ID = "34kttekj";
-const CHANGELOG_TEXT_FIELDS = ["brand", "description", "partOrdered", "partSource"];
-const CHANGELOG_DISCRETE_FIELDS = ["status", "color1", "color2", "waitTime", "workorderLines", "taxFree"];
+const CHANGELOG_TEXT_FIELDS = ["partOrdered", "partSource"];
+const CHANGELOG_DISCRETE_FIELDS = ["status", "waitTime", "workorderLines", "taxFree"];
 const CHANGELOG_TRACKED_FIELDS = [...CHANGELOG_TEXT_FIELDS, ...CHANGELOG_DISCRETE_FIELDS];
 const changeLogDebounceMap = {};
 
@@ -1989,6 +1989,33 @@ export const usePhoneConfigStore = create(
     }
   )
 );
+
+// Road-call expectation window state. `expectations` is the raw list of
+// non-expired expectation docs from the call-expectations collection;
+// `activeExpectation` is the single most-recent one (the one the banner
+// surfaces). For Bonita V1 only one user is logged in per device, so we
+// keep this lightweight and let the UI sort it out.
+export const useRoadCallStore = create((set, get) => ({
+  expectations: [],
+  activeExpectation: null,
+
+  getExpectations: () => get().expectations,
+  getActiveExpectation: () => get().activeExpectation,
+
+  setExpectations: (expectations) => {
+    const now = Date.now();
+    const live = (expectations || []).filter(
+      (e) => e && e.expiresAt && e.expiresAt > now
+    );
+    live.sort((a, b) => (b.setAt || 0) - (a.setAt || 0));
+    set({
+      expectations: live,
+      activeExpectation: live.length ? live[0] : null,
+    });
+  },
+
+  clearActiveExpectation: () => set({ activeExpectation: null }),
+}));
 
 export const useUploadProgressStore = create((set, get) => ({
   // null | { completed, total, failed, done }

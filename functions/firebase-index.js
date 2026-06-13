@@ -7672,6 +7672,13 @@ exports.phoneVoiceInbound = _phoneVoice.phoneVoiceInbound;
 exports.phoneVoiceDialAction = _phoneVoice.phoneVoiceDialAction;
 exports.phoneVoiceSipOutbound = _phoneVoice.phoneVoiceSipOutbound;
 
+// ── Road calling — dedicated on-the-road number, outbound bridge +
+// inbound expectation-window routing. See functions/bonita/road-voice.js. ──
+const _roadVoice = require("./bonita/road-voice");
+exports.roadCallInitiate = _roadVoice.roadCallInitiate;
+exports.roadCallCancel = _roadVoice.roadCallCancel;
+exports.roadVoiceInbound = _roadVoice.roadVoiceInbound;
+
 } // ─── end of if (DEPLOY_TARGET === "bonita") ───
 
 // ============================================================================

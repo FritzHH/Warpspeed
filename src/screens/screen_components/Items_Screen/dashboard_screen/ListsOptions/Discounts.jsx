@@ -102,12 +102,20 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    let newType =
-                      item.type === DISCOUNT_TYPES.percent
-                        ? DISCOUNT_TYPES.dollar
-                        : DISCOUNT_TYPES.percent;
+                    // Cycle: % -> $ (per-line) -> $ EA (per-item) -> %
+                    const isPercent = item.type === DISCOUNT_TYPES.percent;
+                    const isDollarPerLine =
+                      item.type === DISCOUNT_TYPES.dollar && !item.perItem;
+                    let next;
+                    if (isPercent) {
+                      next = { type: DISCOUNT_TYPES.dollar, perItem: false };
+                    } else if (isDollarPerLine) {
+                      next = { type: DISCOUNT_TYPES.dollar, perItem: true };
+                    } else {
+                      next = { type: DISCOUNT_TYPES.percent, perItem: false };
+                    }
                     let discountsArr = zSettingsObj.discounts.map((o) => {
-                      if (o.id === item.id) return { ...o, type: newType };
+                      if (o.id === item.id) return { ...o, ...next };
                       return o;
                     });
                     handleSettingsFieldChange("discounts", discountsArr);
@@ -117,9 +125,20 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     borderColor: C.buttonLightGreenOutline,
                     backgroundColor: C.listItemWhite,
                   }}
+                  aria-label={
+                    item.type === DISCOUNT_TYPES.percent
+                      ? "Percent (click for dollar per line)"
+                      : item.perItem
+                        ? "Dollar per item (click for percent)"
+                        : "Dollar per line (click for dollar per item)"
+                  }
                 >
                   <span className={styles.discountTypeToggleText} style={{ color: C.text }}>
-                    {item.type === DISCOUNT_TYPES.percent ? "%" : "$"}
+                    {item.type === DISCOUNT_TYPES.percent
+                      ? "%"
+                      : item.perItem
+                        ? "$ EA"
+                        : "$"}
                   </span>
                 </button>
                 <MoveArrows

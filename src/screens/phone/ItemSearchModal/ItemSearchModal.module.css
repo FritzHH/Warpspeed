@@ -9,28 +9,128 @@
   flex-direction: column;
 }
 
-.header {
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.checkboxWrap {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  padding-left: 12px;
-  padding-right: 12px;
-  padding-top: 10px;
-  padding-bottom: 10px;
-  background-color: var(--surface-accent-muted);
-  border-bottom-width: 1px;
-  border-bottom-style: solid;
-  border-bottom-color: var(--border-default);
+  justify-content: center;
+  padding: 8px;
+  margin: -8px;
   flex-shrink: 0;
 }
 
-.headerBtn {
-  padding: 6px;
+.resultRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  padding-left: 6px;
+  padding-right: 14px;
+  box-sizing: border-box;
+  cursor: pointer;
 }
 
-.headerBtnConfirm {
+.resultRow:nth-child(even) {
+  background-color: var(--surface-alt);
+}
+
+.resultRowSelected,
+.resultRow.resultRowSelected,
+.resultRow:nth-child(even).resultRowSelected {
+  background-color: var(--surface-success-muted);
+}
+
+.resultName {
+  font-size: 15px;
+  flex: 1;
+  margin-left: 9px;
+  margin-right: 10px;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.resultPrice {
+  font-size: 14px;
+  color: var(--success);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 80px;
+  text-align: right;
+}
+
+.emptyWrapper {
+  display: flex;
+  align-items: center;
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+.emptyText {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.actionBar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background-color: var(--surface-accent-muted);
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: var(--border-default);
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  width: 40%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-radius: 8px;
+  background-color: var(--surface-alt);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  box-sizing: border-box;
+}
+
+.actionBtnText {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.searchRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-top: 8px;
+  padding-bottom: 10px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background-color: var(--surface-accent-muted);
+  flex-shrink: 0;
+}
+
+.searchRowBtn {
   padding: 6px;
-  margin-left: 8px;
 }
 
 .searchWrapper {
@@ -53,61 +153,4 @@
   background-color: var(--surface-raised);
   outline: none;
   box-sizing: border-box;
-}
-
-.list {
-  flex: 1;
-  overflow-y: auto;
-  padding-bottom: 8px;
-}
-
-.resultRow {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding-top: 12px;
-  padding-bottom: 12px;
-  padding-left: 14px;
-  padding-right: 14px;
-  box-sizing: border-box;
-  cursor: pointer;
-}
-
-.resultRowDivider {
-  border-top-width: 1px;
-  border-top-style: solid;
-  border-top-color: var(--border-subtle);
-}
-
-.resultRowSelected {
-  background-color: var(--surface-success-muted);
-}
-
-.resultName {
-  font-size: 15px;
-  flex: 1;
-  margin-right: 10px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.resultPrice {
-  font-size: 14px;
-  color: var(--success);
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.emptyWrapper {
-  display: flex;
-  align-items: center;
-  padding-top: 20px;
-  padding-bottom: 20px;
-}
-
-.emptyText {
-  font-size: 14px;
-  color: var(--text-muted);
 }

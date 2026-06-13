@@ -806,7 +806,7 @@ export function BaseScreen() {
       )}
       <NewCheckoutModalScreen />
       {zOrderingModalVisible && (
-        <Suspense fallback={<SmallLoadingIndicator />}>
+        <Suspense fallback={null}>
           <OrderingModalScreen handleExit={() => useOrderingModalStore.getState().hide()} />
         </Suspense>
       )}

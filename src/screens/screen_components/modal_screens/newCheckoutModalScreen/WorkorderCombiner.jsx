@@ -340,7 +340,8 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                     onRemove={() => deleteLine(wo, lineIdx)}
                                     discounts={safeDiscounts}
                                     currentDiscount={line.discountObj}
-                                    maxDiscountCents={lineTotal}
+                                    unitPriceCents={price}
+                                    qty={line.qty || 1}
                                     onSelectDiscount={(discount) => {
                                       if (!discount) {
                                         handleDiscount(wo, line, null);
@@ -351,9 +352,10 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                     onCustomPercent={(num) => {
                                       handleDiscount(wo, line, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
                                     }}
-                                    onCustomDollar={(cents) => {
+                                    onCustomDollar={(cents, perItem) => {
                                       const dollars = (cents / 100).toFixed(2);
-                                      handleDiscount(wo, line, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true });
+                                      const name = "$" + dollars + (perItem ? " Off Each" : " Off");
+                                      handleDiscount(wo, line, { id: "custom_" + Date.now(), name, value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true, perItem: !!perItem });
                                     }}
                                     triggerStyle={{ marginRight: 3 }}
                                   />

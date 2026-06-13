@@ -1,0 +1,245 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: var(--surface-base);
+  position: relative;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 8%;
+  flex-shrink: 0;
+  padding: 0 4%;
+  background-color: var(--surface-alt);
+  border-bottom: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 92%;
+  flex-shrink: 0;
+  padding: 4%;
+  box-sizing: border-box;
+}
+
+.video {
+  width: 100%;
+  height: 80%;
+  flex-shrink: 0;
+  background-color: rgb(0, 0, 0);
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.errorBanner {
+  font-size: 13px;
+  color: var(--danger);
+  text-align: center;
+  padding: 0 8%;
+}
+
+/* ---- Item detail modal ---- */
+
+.modalOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--surface-overlay);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.modalCard {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90%;
+  background-color: var(--surface-raised);
+  border-radius: 16px;
+  padding: 16px;
+  gap: 12px;
+  box-shadow: 0 12px 32px var(--shadow-color-default);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.modalActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background-color: transparent;
+  border-radius: var(--radius-control);
+  padding: 6px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.iconBtn:hover {
+  transform: translateY(-2px);
+}
+
+.iconBtnActive {
+  background-color: var(--surface-accent-muted);
+}
+
+.iconBtnImg {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.fieldValue {
+  font-size: 15px;
+  color: var(--text-default);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.textInput {
+  width: 100%;
+  font-size: 15px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--surface-success-muted);
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 56px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 12px;
+  background-color: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.closeBtn:active {
+  background-color: var(--accent-hover);
+}
+
+.importBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 56px;
+  flex-shrink: 0;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background-color: transparent;
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.importBtn:active {
+  background-color: var(--surface-accent-muted);
+}
+
+.toastOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 14px 22px;
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-overlay-heavy);
+  color: var(--text-on-accent);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px var(--shadow-color-default);
+}

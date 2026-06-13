@@ -183,6 +183,95 @@
   margin-right: 10px;
 }
 
+.marginWrap {
+  flex-shrink: 0;
+  width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 6px 10px;
+  margin-left: 10px;
+  border-radius: var(--radius-row);
+  background-color: var(--surface-alt);
+  border: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+}
+
+.marginLabel {
+  font-style: italic;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.marginValue {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* Vendor specs — show/hide toggle + pills */
+.specsToggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+}
+
+.specsToggleChevron {
+  font-size: 10px;
+  line-height: 1;
+  transition: transform 120ms ease;
+  display: inline-block;
+}
+
+.specsToggleLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.specsToggleCount {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.specsWrap {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.specChip {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  padding: 4px 10px;
+  border-radius: var(--radius-control);
+}
+
+.specChipLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-right: 6px;
+}
+
+.specChipValue {
+  font-size: 13px;
+  font-weight: 500;
+}
+
 /* Barcodes */
 .barcodesCol {
   flex: 1;

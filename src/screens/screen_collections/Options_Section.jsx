@@ -35,6 +35,7 @@ import {
   useEmailStore,
 } from "../../stores";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
+import { useGatedAction } from "../../hooks/useLoginGate";
 const PayrollModal = lazy(() =>
   import("../screen_components/modal_screens/PayrollModal").then((m) => ({
     default: m.PayrollModal,
@@ -141,6 +142,10 @@ export const TabBar = ({
   const zUseFacialRecognition = useSettingsStore((state) => state.settings?.useFacialRecognition !== false);
   const zInAppMessages = useLoginStore((state) => state.inAppMessages) || {};
   const zManagerNotes = useLoginStore((state) => state.managerNotes) || {};
+
+  const handleClickMessagesTab = useGatedAction(() => {
+    useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.messages);
+  });
 
   let userUnreadCount = 0;
   let managerUnreadCount = 0;
@@ -336,7 +341,7 @@ export const TabBar = ({
           isSelected={zOptionsTabName === TAB_NAMES.optionsTab.workorders}
         />
         <TabMenuButton
-          onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.messages)}
+          onPress={handleClickMessagesTab}
           onMouseEnter={preloadMessagesComponent}
           onFocus={preloadMessagesComponent}
           text={TAB_NAMES.optionsTab.messages}

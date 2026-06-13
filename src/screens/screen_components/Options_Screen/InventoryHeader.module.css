@@ -39,6 +39,30 @@
   margin-left: 15px;
 }
 
+.catalogsBtn {
+  font-size: 14px;
+  color: var(--text-default);
+  padding: 6px 10px;
+  border: 1px solid var(--border-default);
+  white-space: nowrap;
+  min-width: 130px;
+}
+
+@keyframes catalogsSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.catalogsSpinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--border-subtle);
+  border-top-color: currentColor;
+  animation: catalogsSpin 0.75s linear infinite;
+}
+
 .icon {
   width: 20px;
   height: 20px;
@@ -56,6 +80,7 @@
 .input {
   flex: 1;
   min-width: 0;
+  margin-right: 15px;
   font-size: 18px;
   color: var(--text-default);
   background: transparent;

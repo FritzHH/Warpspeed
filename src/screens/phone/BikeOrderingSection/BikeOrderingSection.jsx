@@ -1,34 +1,89 @@
 import { useState, useRef } from "react";
 import { ICONS, C } from "../../../styles";
-import { useOpenWorkordersStore } from "../../../stores";
+import {
+  useOpenWorkordersStore,
+  useSettingsStore,
+  useAlertScreenStore,
+  useLoginStore,
+} from "../../../stores";
 import {
   capitalizeFirstLetterOfString,
   checkInputForNumbersOnly,
   calculateWaitEstimateLabel,
   formatMillisForDisplay,
+  localStorageWrapper,
+  printBuilder,
 } from "../../../utils";
+import { dbSavePrintObj } from "../../../db_calls_wrapper";
 import {
   Image,
   DropdownMenu,
   CheckBox,
   TouchableOpacity,
+  PanelJumpBlocker,
+  ModalFooter,
+  ModalFooterButton,
 } from "../../../dom_components";
+import { useAutoJumpBlock } from "../../../hooks/useAutoJumpBlock";
+import { useZ } from "../../../hooks/useZ";
 import { MILLIS_IN_DAY } from "../../../constants";
 import { COLORS, NONREMOVABLE_WAIT_TIMES } from "../../../data";
-import cloneDeep from "lodash/cloneDeep";
 import styles from "./BikeOrderingSection.module.css";
 
-const DROPDOWN_BTN_STYLE = { marginLeft: 6, paddingLeft: 8, paddingRight: 8 };
-const DROPDOWN_BTN_STYLE_TIGHT = { marginLeft: 4, paddingLeft: 8, paddingRight: 8 };
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatChangeLogTime(millis) {
+  const d = new Date(millis);
+  const day = DAY_NAMES[d.getDay()];
+  const month = MONTH_NAMES[d.getMonth()];
+  const date = d.getDate();
+  let hour = d.getHours();
+  const amPM = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12 || 12;
+  const min = d.getMinutes().toString().padStart(2, "0");
+  return `${day}, ${month} ${date} ${hour}:${min} ${amPM}`;
+}
+
+function describeChangeLogEntry(entry) {
+  if (entry.field === "workorderLines") {
+    if (entry.action === "added") return `added '${entry.to}' to line items`;
+    if (entry.action === "removed") return `removed '${entry.from}' from line items`;
+    if (entry.action === "changed") return `changed ${entry.detail} on '${entry.item}' from '${entry.from}' to '${entry.to}'`;
+  }
+  if (entry.field === "status") return `changed status from '${entry.from}' to '${entry.to}'`;
+  if (entry.field === "color1" || entry.field === "color2") {
+    const label = entry.field === "color1" ? "primary color" : "secondary color";
+    return `changed ${label}${entry.from ? ` from '${entry.from}'` : ""} to '${entry.to}'`;
+  }
+  if (entry.field === "taxFree") return `changed tax exempt from '${entry.from}' to '${entry.to}'`;
+  const fieldLabel = entry.field === "partOrdered" ? "part ordered" : entry.field === "partSource" ? "part source" : entry.field;
+  return `changed ${fieldLabel}${entry.from ? ` from '${entry.from}'` : ""} to '${entry.to}'`;
+}
+
+const PRINT_BTN_STYLE = {
+  backgroundColor: "transparent",
+  borderColor: "transparent",
+  paddingLeft: 4,
+  paddingRight: 4,
+  paddingTop: 4,
+  paddingBottom: 4,
+  height: "auto",
+};
+const DROPDOWN_BTN_STYLE = { marginLeft: 6, paddingLeft: 8, paddingRight: 8, height: 38 };
+const DROPDOWN_BTN_STYLE_TIGHT = { marginLeft: 4, paddingLeft: 8, paddingRight: 8, height: 38 };
 const COLOR_DROPDOWN_ITEM_SEPARATOR_STYLE = { height: 0 };
-const COLOR_DROPDOWN_ITEM_TEXT_STYLE = { fontSize: 17 };
-const COLOR_DROPDOWN_ITEM_STYLE = { paddingTop: 2, paddingBottom: 2 };
-const CHECKBOX_TEXT_STYLE = { fontSize: 13 };
+const COLOR_DROPDOWN_ITEM_TEXT_STYLE = { fontSize: 20 };
+const COLOR_DROPDOWN_ITEM_STYLE = { paddingTop: 10, paddingBottom: 10 };
+const COLOR_BUTTON_STYLE = { height: 34, paddingLeft: 8, paddingRight: 8 };
+const CHECKBOX_TEXT_STYLE = { fontSize: 15 };
 const CHECKBOX_BUTTON_STYLE = { backgroundColor: "transparent", marginBottom: 8 };
 const GRAY_FALLBACK = C.textMuted;
 
-export function BikeOrderingSection({ workorder, zSettings, setField }) {
+export function BikeOrderingSection({ workorder, zSettings, setField, statusPill, pickupDeliveryRow }) {
   const [sBikeEditing, _setBikeEditing] = useState(false);
+  const [sShowChangeLog, _setShowChangeLog] = useState(false);
+  const zChangeLog = useZ("modal", sShowChangeLog);
   const [sOrderingOpen, _setOrderingOpen] = useState(
     !!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber || workorder.partOrderEstimateMillis)
   );
@@ -38,21 +93,105 @@ export function BikeOrderingSection({ workorder, zSettings, setField }) {
   });
   const waitDaysTimerRef = useRef(null);
 
-  function setBikeColor(incomingColorVal, fieldName) {
-    let foundColor = false;
-    let newColorObj = {};
-    COLORS.forEach((bikeColorObj) => {
-      if (bikeColorObj.label.toLowerCase() === incomingColorVal.toLowerCase()) {
-        foundColor = true;
-        newColorObj = cloneDeep(bikeColorObj);
-      }
+  const [sBrandFocused, _setBrandFocused] = useState(false);
+  const [sDescFocused, _setDescFocused] = useState(false);
+  const brandInputRef = useRef(null);
+  const descInputRef = useRef(null);
+  const color1DropdownRef = useRef(null);
+  const brandBackspaced = useRef(false);
+  const descBackspaced = useRef(false);
+  const brandPrevValRef = useRef("");
+  const descPrevValRef = useRef("");
+  const autoJumpBlock = useAutoJumpBlock();
+
+  const brandSuggestions = sBrandFocused && workorder.brand?.trim().length >= 1
+    ? (zSettings.allBrands || []).filter(
+        (b) => b.toLowerCase().startsWith(workorder.brand.trim().toLowerCase()) && b.toLowerCase() !== workorder.brand.trim().toLowerCase()
+      )
+    : [];
+
+  const descSuggestions = sDescFocused && workorder.description?.trim().length >= 1
+    ? (zSettings.allDescriptions || []).filter(
+        (d) => d.toLowerCase().startsWith(workorder.description.trim().toLowerCase()) && d.toLowerCase() !== workorder.description.trim().toLowerCase()
+      )
+    : [];
+
+  function promptAddHint({ kind, value, settingsKey }) {
+    if (!value || typeof value !== "string") return;
+    const trimmed = value.trim();
+    if (trimmed.length < 3) return;
+    const existing = (zSettings && zSettings[settingsKey]) || [];
+    if (existing.some((v) => v.toLowerCase() === trimmed.toLowerCase())) return;
+    const kindLabel = kind === "brand" ? "brand" : "description";
+    const listLabel = settingsKey === "allBrands" ? "brands" : "descriptions";
+    useAlertScreenStore.getState().setValues({
+      title: `Add ${kindLabel}?`,
+      message: `Add "${trimmed}" to the saved ${listLabel}?`,
+      btn1Text: "Yes",
+      handleBtn1Press: () => {
+        const current = useSettingsStore.getState().settings?.[settingsKey] || [];
+        if (!current.some((v) => v.toLowerCase() === trimmed.toLowerCase())) {
+          const updated = [...current, trimmed].sort((a, b) =>
+            a.toLowerCase().localeCompare(b.toLowerCase())
+          );
+          useSettingsStore.getState().setField(settingsKey, updated);
+        }
+        useAlertScreenStore.getState().resetAll();
+      },
+      btn2Text: "No",
+      handleBtn2Press: () => useAlertScreenStore.getState().resetAll(),
+      showAlert: true,
+      canExitOnOuterClick: true,
     });
-    if (!foundColor) {
-      newColorObj.label = incomingColorVal;
-      newColorObj.backgroundColor = null;
-      newColorObj.textColor = null;
+  }
+
+  function getCustomerForPrint() {
+    if (!workorder) return {};
+    return {
+      first: workorder.customerFirst || "",
+      last: workorder.customerLast || "",
+      customerCell: workorder.customerCell || "",
+      customerLandline: workorder.customerLandline || "",
+      email: workorder.customerEmail || "",
+    };
+  }
+
+  function handleIntakePrint() {
+    const printerID = localStorageWrapper.getItem("selectedPrinterID");
+    if (!printerID) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Printer Selected",
+        message: "Open the Printing menu to choose a thermal printer for this phone.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
     }
-    setField(fieldName, newColorObj);
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const toPrint = printBuilder.intake(workorder, getCustomerForPrint(), _settings?.salesTaxPercent, _ctx);
+    dbSavePrintObj(toPrint, printerID);
+  }
+
+  function handleWorkorderPrint() {
+    const printerID = localStorageWrapper.getItem("selectedPrinterID");
+    if (!printerID) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Printer Selected",
+        message: "Open the Printing menu to choose a thermal printer for this phone.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const toPrint = printBuilder.workorder(workorder, getCustomerForPrint(), _settings?.salesTaxPercent, _ctx);
+    dbSavePrintObj(toPrint, printerID);
   }
 
   function updateWaitDays(newDays) {
@@ -67,27 +206,128 @@ export function BikeOrderingSection({ workorder, zSettings, setField }) {
 
   return (
     <div className={styles.card}>
+      <PanelJumpBlocker show={autoJumpBlock.blocking} message={autoJumpBlock.message} />
       <div className={styles.editToggleRow}>
-        <TouchableOpacity onPress={() => _setBikeEditing(!sBikeEditing)} className={styles.editBtn}>
-          <Image icon={ICONS.editPencil} size={18} />
-        </TouchableOpacity>
+        <div className={styles.statusSlot}>{statusPill}</div>
+        <div className={styles.actionBtnGroup}>
+          <TouchableOpacity onPress={() => _setShowChangeLog(true)} className={styles.infoBtn}>
+            <Image icon={ICONS.info} size={24} />
+          </TouchableOpacity>
+          {(() => {
+            const selectedPrinterID = localStorageWrapper.getItem("selectedPrinterID");
+            const selectedPrinter = selectedPrinterID && zSettings?.printers
+              ? zSettings.printers[selectedPrinterID]
+              : null;
+            const printDisabled = !selectedPrinter || selectedPrinter.active !== true;
+            return (
+              <DropdownMenu
+                buttonIcon={ICONS.print}
+                buttonIconSize={24}
+                buttonStyle={PRINT_BTN_STYLE}
+                itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
+                disabled={printDisabled}
+                dataArr={[{ label: "Intake / Estimate" }, { label: "Workorder" }]}
+                onSelect={(item) => {
+                  if (item.label === "Intake / Estimate") handleIntakePrint();
+                  else if (item.label === "Workorder") handleWorkorderPrint();
+                }}
+              />
+            );
+          })()}
+          <TouchableOpacity onPress={() => _setBikeEditing(!sBikeEditing)} className={styles.editBtn}>
+            <Image icon={ICONS.editPencil} size={29} />
+          </TouchableOpacity>
+        </div>
       </div>
+      {pickupDeliveryRow ? (
+        <div className={styles.pickupRowSlot}>{pickupDeliveryRow}</div>
+      ) : null}
+      <div className={styles.divider} />
 
       {sBikeEditing ? (
         <div>
           <span className={styles.fieldLabel}>Brand</span>
           <div className={styles.fieldRow}>
-            <input
-              className={styles.input}
-              value={capitalizeFirstLetterOfString(workorder.brand || "")}
-              onChange={(e) => setField("brand", capitalizeFirstLetterOfString(e.target.value))}
-              placeholder="Brand"
-            />
+            <div className={styles.autocompleteWrap}>
+              <input
+                ref={brandInputRef}
+                className={styles.input}
+                value={capitalizeFirstLetterOfString(workorder.brand || "")}
+                onKeyDown={(e) => { if (e.key === "Backspace") brandBackspaced.current = true; }}
+                onChange={(e) => {
+                  const val = capitalizeFirstLetterOfString(e.target.value);
+                  if (val.length < brandPrevValRef.current.length) brandBackspaced.current = true;
+                  brandPrevValRef.current = val;
+                  setField("brand", val);
+                  if (!brandBackspaced.current && val.trim().length >= 2) {
+                    const q = val.trim().toLowerCase();
+                    const matches = (useSettingsStore.getState().settings?.allBrands || []).filter(
+                      (b) => b.toLowerCase().startsWith(q) && b.toLowerCase() !== q
+                    );
+                    if (matches.length === 1) {
+                      const picked = matches[0];
+                      setField("brand", picked);
+                      _setBrandFocused(false);
+                      if (brandInputRef.current) brandInputRef.current.blur();
+                      autoJumpBlock.trigger(`${picked}  \u2192  Description`, () => {
+                        if (descInputRef.current) descInputRef.current.focus();
+                      });
+                    }
+                  }
+                }}
+                onFocus={() => {
+                  _setBrandFocused(true);
+                  brandBackspaced.current = false;
+                  brandPrevValRef.current = workorder.brand || "";
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    _setBrandFocused(false);
+                    brandBackspaced.current = false;
+                    const allWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+                    const curWO = allWOs.find((w) => w.id === workorder.id);
+                    promptAddHint({ kind: "brand", value: curWO?.brand, settingsKey: "allBrands" });
+                  }, 150);
+                }}
+                placeholder="Brand"
+              />
+              {brandSuggestions.length > 0 && (
+                <div className={styles.suggestList}>
+                  {brandSuggestions.map((item) => (
+                    <div key={item} className={styles.suggestRow}>
+                      <button
+                        type="button"
+                        className={styles.suggestPickBtn}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setField("brand", item);
+                          _setBrandFocused(false);
+                        }}
+                      >
+                        {item}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.suggestDelBtn}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const updated = (zSettings.allBrands || []).filter((b) => b !== item);
+                          useSettingsStore.getState().setField("allBrands", updated);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <DropdownMenu
               dataArr={zSettings.bikeBrands}
               onSelect={(item) => setField("brand", item)}
               buttonText={zSettings.bikeBrandsName || "Bikes"}
               buttonStyle={DROPDOWN_BTN_STYLE}
+              itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
             />
             {zSettings.bikeOptionalBrands?.length > 0 && (
               <DropdownMenu
@@ -95,79 +335,138 @@ export function BikeOrderingSection({ workorder, zSettings, setField }) {
                 onSelect={(item) => setField("brand", item)}
                 buttonText={zSettings.bikeOptionalBrandsName || "Other"}
                 buttonStyle={DROPDOWN_BTN_STYLE_TIGHT}
+                itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
               />
             )}
           </div>
 
           <span className={styles.fieldLabel}>Description</span>
           <div className={styles.fieldRow}>
-            <input
-              className={styles.input}
-              value={capitalizeFirstLetterOfString(workorder.description || "")}
-              onChange={(e) => setField("description", capitalizeFirstLetterOfString(e.target.value))}
-              placeholder="Description"
-            />
+            <div className={styles.autocompleteWrap}>
+              <input
+                ref={descInputRef}
+                className={styles.input}
+                value={capitalizeFirstLetterOfString(workorder.description || "")}
+                onKeyDown={(e) => { if (e.key === "Backspace") descBackspaced.current = true; }}
+                onChange={(e) => {
+                  const val = capitalizeFirstLetterOfString(e.target.value);
+                  if (val.length < descPrevValRef.current.length) descBackspaced.current = true;
+                  descPrevValRef.current = val;
+                  setField("description", val);
+                  if (!descBackspaced.current && val.trim().length >= 2) {
+                    const q = val.trim().toLowerCase();
+                    const matches = (useSettingsStore.getState().settings?.allDescriptions || []).filter(
+                      (d) => d.toLowerCase().startsWith(q) && d.toLowerCase() !== q
+                    );
+                    if (matches.length === 1) {
+                      const picked = matches[0];
+                      setField("description", picked);
+                      _setDescFocused(false);
+                      if (descInputRef.current) descInputRef.current.blur();
+                      autoJumpBlock.trigger(`${picked}  \u2192  Color 1`, () => {
+                        if (color1DropdownRef.current?.open) color1DropdownRef.current.open();
+                      });
+                    }
+                  }
+                }}
+                onFocus={() => {
+                  _setDescFocused(true);
+                  descBackspaced.current = false;
+                  descPrevValRef.current = workorder.description || "";
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    _setDescFocused(false);
+                    descBackspaced.current = false;
+                    const allWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+                    const curWO = allWOs.find((w) => w.id === workorder.id);
+                    promptAddHint({ kind: "description", value: curWO?.description, settingsKey: "allDescriptions" });
+                  }, 150);
+                }}
+                placeholder="Description"
+              />
+              {descSuggestions.length > 0 && (
+                <div className={styles.suggestList}>
+                  {descSuggestions.map((item) => (
+                    <div key={item} className={styles.suggestRow}>
+                      <button
+                        type="button"
+                        className={styles.suggestPickBtn}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setField("description", item);
+                          _setDescFocused(false);
+                        }}
+                      >
+                        {item}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.suggestDelBtn}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const updated = (zSettings.allDescriptions || []).filter((d) => d !== item);
+                          useSettingsStore.getState().setField("allDescriptions", updated);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <DropdownMenu
               dataArr={zSettings.bikeDescriptions}
               onSelect={(item) => setField("description", item)}
               buttonText="Descriptions"
               buttonStyle={DROPDOWN_BTN_STYLE}
+              itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
             />
           </div>
 
           <span className={styles.fieldLabel}>Colors</span>
           <div className={styles.fieldRow}>
-            <div className={styles.colorPair}>
-              <input
-                className={styles.input}
-                value={workorder.color1?.label || ""}
-                onChange={(e) => setBikeColor(e.target.value, "color1")}
-                placeholder="Color 1"
-                style={{
-                  backgroundColor: workorder.color1?.backgroundColor || undefined,
-                  color: workorder.color1?.textColor || undefined,
-                }}
-              />
-              <DropdownMenu
-                dataArr={COLORS}
-                itemSeparatorStyle={COLOR_DROPDOWN_ITEM_SEPARATOR_STYLE}
-                itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
-                itemStyle={COLOR_DROPDOWN_ITEM_STYLE}
-                menuBorderColor="transparent"
-                centerMenuVertically={true}
-                centerMenuHorizontally={true}
-                menuMaxHeight={Math.round(window.innerHeight * 0.9)}
-                onSelect={(item) => setField("color1", item)}
-                buttonText="1"
-                buttonStyle={DROPDOWN_BTN_STYLE_TIGHT}
-              />
-            </div>
+            <DropdownMenu
+              ref={color1DropdownRef}
+              dataArr={COLORS}
+              itemSeparatorStyle={COLOR_DROPDOWN_ITEM_SEPARATOR_STYLE}
+              itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
+              itemStyle={COLOR_DROPDOWN_ITEM_STYLE}
+              menuBorderColor="transparent"
+              centerMenuVertically={true}
+              centerMenuHorizontally={true}
+              menuMaxHeight={Math.max(200, window.innerHeight - 40)}
+              onSelect={(item) => setField("color1", item)}
+              buttonText={workorder.color1?.label || "Color 1"}
+              buttonStyle={{
+                ...COLOR_BUTTON_STYLE,
+                backgroundColor: workorder.color1?.backgroundColor || undefined,
+              }}
+              buttonTextStyle={{
+                color: workorder.color1?.textColor || undefined,
+              }}
+            />
             <div className={styles.colorGap} />
-            <div className={styles.colorPair}>
-              <input
-                className={styles.input}
-                value={workorder.color2?.label || ""}
-                onChange={(e) => setBikeColor(e.target.value, "color2")}
-                placeholder="Color 2"
-                style={{
-                  backgroundColor: workorder.color2?.backgroundColor || undefined,
-                  color: workorder.color2?.textColor || undefined,
-                }}
-              />
-              <DropdownMenu
-                dataArr={COLORS}
-                itemSeparatorStyle={COLOR_DROPDOWN_ITEM_SEPARATOR_STYLE}
-                itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
-                itemStyle={COLOR_DROPDOWN_ITEM_STYLE}
-                menuBorderColor="transparent"
-                centerMenuVertically={true}
-                centerMenuHorizontally={true}
-                menuMaxHeight={Math.round(window.innerHeight * 0.9)}
-                onSelect={(item) => setField("color2", item)}
-                buttonText="2"
-                buttonStyle={DROPDOWN_BTN_STYLE_TIGHT}
-              />
-            </div>
+            <DropdownMenu
+              dataArr={COLORS}
+              itemSeparatorStyle={COLOR_DROPDOWN_ITEM_SEPARATOR_STYLE}
+              itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
+              itemStyle={COLOR_DROPDOWN_ITEM_STYLE}
+              menuBorderColor="transparent"
+              centerMenuVertically={true}
+              centerMenuHorizontally={true}
+              menuMaxHeight={Math.max(200, window.innerHeight - 40)}
+              onSelect={(item) => setField("color2", item)}
+              buttonText={workorder.color2?.label || "Color 2"}
+              buttonStyle={{
+                ...COLOR_BUTTON_STYLE,
+                backgroundColor: workorder.color2?.backgroundColor || undefined,
+              }}
+              buttonTextStyle={{
+                color: workorder.color2?.textColor || undefined,
+              }}
+            />
           </div>
 
           <span className={styles.fieldLabel}>Max wait (days)</span>
@@ -192,6 +491,7 @@ export function BikeOrderingSection({ workorder, zSettings, setField }) {
               }}
               buttonText="Wait Times"
               buttonStyle={DROPDOWN_BTN_STYLE}
+              itemTextStyle={COLOR_DROPDOWN_ITEM_TEXT_STYLE}
             />
           </div>
 
@@ -213,123 +513,6 @@ export function BikeOrderingSection({ workorder, zSettings, setField }) {
             onCheck={() => setField("itemNotHere", !workorder.itemNotHere)}
           />
 
-          <TouchableOpacity
-            onPress={() => _setOrderingOpen(!sOrderingOpen)}
-            className={styles.orderingToggle}
-          >
-            <span className={styles.orderingTitle}>ORDERING</span>
-            <Image
-              icon={ICONS.downChevron}
-              size={10}
-              className={`${styles.chevron} ${sOrderingOpen ? styles.chevronOpen : ""}`}
-            />
-          </TouchableOpacity>
-
-          {sOrderingOpen && (
-            <div>
-              <span className={styles.fieldLabel}>Item ordered</span>
-              <input
-                className={`${styles.input} ${styles.inputNoTopMargin8}`}
-                value={capitalizeFirstLetterOfString(workorder.partOrdered || "")}
-                onChange={(e) => {
-                  setField("partOrdered", e.target.value);
-                  if (!workorder.partOrderedMillis) setField("partOrderedMillis", Date.now());
-                }}
-                placeholder="Item names/descriptions"
-              />
-
-              <span className={styles.fieldLabel}>Source</span>
-              <div className={styles.fieldRow}>
-                <input
-                  className={styles.input}
-                  value={capitalizeFirstLetterOfString(workorder.partSource || "")}
-                  onChange={(e) => {
-                    setField("partSource", e.target.value);
-                    if (!workorder.partOrderedMillis) setField("partOrderedMillis", Date.now());
-                  }}
-                  placeholder="Item sources"
-                />
-                <DropdownMenu
-                  dataArr={zSettings.partSources}
-                  onSelect={(item) => {
-                    setField("partSource", item);
-                    setField("partOrderedMillis", Date.now());
-                  }}
-                  buttonText="Sources"
-                  buttonStyle={DROPDOWN_BTN_STYLE}
-                />
-              </div>
-
-              <span className={styles.fieldLabelSmall}>Est. delivery</span>
-              <div className={styles.deliveryRow}>
-                <TouchableOpacity
-                  onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
-                  className={styles.waitBtn}
-                >
-                  <span className={styles.waitBtnText}>{"\u2212"}</span>
-                </TouchableOpacity>
-                <span className={styles.waitDaysText}>
-                  {sWaitDays + " days"}
-                </span>
-                <TouchableOpacity
-                  onPress={() => updateWaitDays(sWaitDays + 1)}
-                  className={styles.waitBtn}
-                >
-                  <span className={styles.waitBtnText}>+</span>
-                </TouchableOpacity>
-                {!!workorder.partOrderEstimateMillis && (
-                  <span className={styles.deliveryDate}>
-                    {formatMillisForDisplay(workorder.partOrderEstimateMillis)}
-                  </span>
-                )}
-              </div>
-
-              <TouchableOpacity
-                onPress={() => {
-                  const newVal = !workorder.partToBeOrdered;
-                  setField("partToBeOrdered", newVal);
-                  setField("status", newVal ? "is_order_part_for_customer" : "part_ordered");
-                }}
-                className={styles.orderedToggle}
-              >
-                <div
-                  className={`${styles.orderedDotOuter} ${workorder.partToBeOrdered ? styles.orderedRedBorder : styles.orderedGreenBorder}`}
-                >
-                  <div
-                    className={`${styles.orderedDotInner} ${workorder.partToBeOrdered ? styles.orderedRedBg : styles.orderedGreenBg}`}
-                  />
-                </div>
-                <span
-                  className={`${styles.orderedText} ${workorder.partToBeOrdered ? styles.orderedRedText : styles.orderedGreenText}`}
-                >
-                  {workorder.partToBeOrdered ? "Not ordered" : "Ordered"}
-                </span>
-              </TouchableOpacity>
-
-              <span className={styles.fieldLabel}>Tracking</span>
-              <input
-                className={`${styles.input} ${styles.inputNoTopMargin4}`}
-                value={workorder.trackingNumber || ""}
-                onChange={(e) => setField("trackingNumber", e.target.value)}
-                placeholder="Tracking num or website"
-              />
-              {!!workorder.trackingNumber && (() => {
-                const val = workorder.trackingNumber.trim();
-                const isURL = /^https?:\/\/|^www\./i.test(val);
-                const openUrl = isURL && val.startsWith("www.") ? "https://" + val : val;
-                return (
-                  <TouchableOpacity
-                    onPress={() => window.open(isURL ? openUrl : "https://parcelsapp.com/en/tracking/" + val, "_blank")}
-                    className={styles.trackingLink}
-                  >
-                    <span className={styles.linkText}>
-                      {isURL ? "Open link" : "Track package"}
-                    </span>
-                  </TouchableOpacity>
-                );
-              })()}
-            </div>
-          )}
         </div>
       ) : (
         <div>
@@ -398,76 +581,62 @@ export function BikeOrderingSection({ workorder, zSettings, setField }) {
             </span>
           )}
 
-          <TouchableOpacity
-            onPress={() => _setOrderingOpen(!sOrderingOpen)}
-            className={styles.readOrderingToggle}
-          >
-            <span className={styles.orderingTitle}>ORDERING</span>
-            <Image
-              icon={ICONS.downChevron}
-              size={10}
-              className={`${styles.chevron} ${sOrderingOpen ? styles.chevronOpen : ""}`}
-            />
-          </TouchableOpacity>
+        </div>
+      )}
 
-          {sOrderingOpen && (
-            <div className={styles.readOrderingBody}>
-              {!!workorder.partOrdered && (
-                <div className={styles.readOrderingItem}>
-                  <span className={styles.fieldLabel}>Item ordered</span>
-                  <span className={styles.readValue}>
-                    {capitalizeFirstLetterOfString(workorder.partOrdered)}
-                  </span>
-                </div>
-              )}
-              {!!workorder.partSource && (
-                <div className={styles.readOrderingItem}>
-                  <span className={styles.fieldLabel}>Source</span>
-                  <span className={styles.readValue}>
-                    {capitalizeFirstLetterOfString(workorder.partSource)}
-                  </span>
-                </div>
-              )}
-              <div className={styles.readDeliveryRow}>
-                {!!workorder.partOrderEstimateMillis && (
-                  <span className={styles.readDeliveryLabel}>
-                    Est. delivery: {formatMillisForDisplay(workorder.partOrderEstimateMillis)}
-                  </span>
-                )}
-                <div className={styles.readOrderedStatus}>
-                  <div
-                    className={`${styles.readOrderedDotOuter} ${workorder.partToBeOrdered ? styles.orderedRedBorder : styles.orderedGreenBorder}`}
-                  >
-                    <div
-                      className={`${styles.readOrderedDotInner} ${workorder.partToBeOrdered ? styles.orderedRedBg : styles.orderedGreenBg}`}
-                    />
-                  </div>
-                  <span
-                    className={`${styles.orderedText} ${workorder.partToBeOrdered ? styles.orderedRedText : styles.orderedGreenText}`}
-                  >
-                    {workorder.partToBeOrdered ? "Not ordered" : "Ordered"}
-                  </span>
-                </div>
-              </div>
-              {!!workorder.trackingNumber && (
-                <div className={styles.readTrackingBlock}>
-                  <span className={styles.fieldLabel}>Tracking</span>
-                  {(() => {
-                    const val = workorder.trackingNumber.trim();
-                    const isURL = /^https?:\/\/|^www\./i.test(val);
-                    const openUrl = isURL && val.startsWith("www.") ? "https://" + val : val;
-                    return (
-                      <TouchableOpacity
-                        onPress={() => window.open(isURL ? openUrl : "https://parcelsapp.com/en/tracking/" + val, "_blank")}
-                      >
-                        <span className={styles.linkTextLarge}>{val}</span>
-                      </TouchableOpacity>
-                    );
-                  })()}
-                </div>
-              )}
+      {sShowChangeLog && (
+        <div
+          className={styles.clBackdrop}
+          style={{ zIndex: zChangeLog }}
+          onClick={() => _setShowChangeLog(false)}
+        >
+          <div className={styles.clCard} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.clHeader}>
+              <span className={styles.clTitle}>Change Log</span>
+              {workorder.startedOnMillis ? (
+                <span className={styles.clSubtitle}>
+                  Started {formatChangeLogTime(workorder.startedOnMillis)}
+                  {workorder.startedBy ? ` by ${workorder.startedBy}` : ""}
+                </span>
+              ) : null}
             </div>
-          )}
+            <div className={styles.clList}>
+              {(() => {
+                const log = (workorder.changeLog || []).filter(
+                  (e) => e && typeof e === "object" && e.timestamp
+                );
+                if (log.length === 0) {
+                  return (
+                    <div className={styles.clEmpty}>No changes recorded</div>
+                  );
+                }
+                const sorted = [...log].sort((a, b) => b.timestamp - a.timestamp);
+                return sorted.map((entry, index) => (
+                  <div
+                    key={`${entry.timestamp}-${index}`}
+                    className={styles.clRow}
+                  >
+                    <div className={styles.clRowTime}>
+                      {formatChangeLogTime(entry.timestamp)}
+                    </div>
+                    <div className={styles.clRowChange}>
+                      <span className={styles.clRowUser}>{entry.user || "Unknown"}</span>
+                      {" "}
+                      {describeChangeLogEntry(entry)}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+            <ModalFooter>
+              <ModalFooterButton
+                variant="accent"
+                onClick={() => _setShowChangeLog(false)}
+              >
+                Close
+              </ModalFooterButton>
+            </ModalFooter>
+          </div>
         </div>
       )}
     </div>

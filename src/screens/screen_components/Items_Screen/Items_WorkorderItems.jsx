@@ -1108,7 +1108,8 @@ export const LineItemComponent = ({
                   onRemove={() => __deleteWorkorderLine(index)}
                   discounts={zSettingsObj.discounts || []}
                   currentDiscount={workorderLine.discountObj}
-                  maxDiscountCents={workorderLine.inventoryItem.price * (workorderLine.qty || 1)}
+                  unitPriceCents={workorderLine.inventoryItem.price}
+                  qty={workorderLine.qty || 1}
                   onSelectDiscount={(discount) => {
                     if (!discount) {
                       __setWorkorderLineItem({ ...workorderLine, discountObj: null });
@@ -1119,9 +1120,10 @@ export const LineItemComponent = ({
                   onCustomPercent={(num) => {
                     applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
                   }}
-                  onCustomDollar={(cents) => {
+                  onCustomDollar={(cents, perItem) => {
                     const dollars = (cents / 100).toFixed(2);
-                    applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true });
+                    const name = "$" + dollars + (perItem ? " Off Each" : " Off");
+                    applyDiscount(workorderLine, { id: "custom_" + Date.now(), name, value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true, perItem: !!perItem });
                   }}
                   triggerStyle={{ marginRight: 3 }}
                 />

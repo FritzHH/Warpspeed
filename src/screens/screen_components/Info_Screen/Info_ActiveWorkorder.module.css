@@ -7,6 +7,7 @@
   padding: 5px 5px 0 5px;
   border-radius: var(--radius-control);
   box-sizing: border-box;
+  position: relative;
 }
 
 .actionBar {
@@ -117,4 +118,30 @@
 
 .restrictionText {
   font-size: 13px;
+}
+
+.pickupResetBtn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin-left: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.pickupResetBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.pickupResetBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.pickupResetIcon {
+  width: 16px;
+  height: 16px;
 }

@@ -7,6 +7,7 @@ import {
   useOpenWorkordersStore,
   useLoginStore,
   useInventoryStore,
+  useRoadCallStore,
 } from "../../stores";
 import {
   dbListenToOpenWorkorders,
@@ -14,12 +15,13 @@ import {
   dbListenToCurrentPunchClock,
   dbListenToInAppMessages,
   dbListenToSettings,
+  dbListenToCallExpectations,
 } from "../../db_calls_wrapper";
 import { authSignOut } from "../../db_calls";
 import { verifyPin, verifyAlternatePin } from "../../utils";
 import { PinEntry } from "./PinEntry/PinEntry";
 import { ListShell } from "./ListShell/ListShell";
-import { WorkorderDetailModal } from "./WorkorderDetailModal";
+import { PrintingModal } from "./PrintingModal/PrintingModal";
 
 const LOCAL_STORAGE_KEY = "warpspeed_phone_user_id";
 
@@ -30,12 +32,10 @@ export function PhoneScreen() {
   const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zPunchClock = useLoginStore((state) => state.punchClock);
 
-  const [sActiveModal, _setActiveModal] = useState(null);
-  const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
+  const [sShowPrinting, _setShowPrinting] = useState(false);
   const [sPin, _setPin] = useState("");
   const [sPinError, _setPinError] = useState("");
   const [sSearch, _setSearch] = useState("");
-  const [sDeepLinkOpenMessages, _setDeepLinkOpenMessages] = useState(false);
   const deepLinkHandledRef = useRef(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -79,20 +79,22 @@ export function PhoneScreen() {
     const unsubSettings = dbListenToSettings((data) => {
       useSettingsStore.getState().setSettings(data, false, false);
     });
+    const unsubExpectations = dbListenToCallExpectations((data) => {
+      useRoadCallStore.getState().setExpectations(data || []);
+    });
     return () => {
       if (typeof unsub === "function") unsub();
       if (typeof unsubInv === "function") unsubInv();
       if (typeof unsubPunch === "function") unsubPunch();
       if (typeof unsubMessages === "function") unsubMessages();
       if (typeof unsubSettings === "function") unsubSettings();
+      if (typeof unsubExpectations === "function") unsubExpectations();
     };
   }, []);
 
-  const selectedWorkorder = zWorkorders.find((w) => w.id === sSelectedWorkorderID) || null;
-
   // Deep-link handler: SMS forwards include /phone?conv=<custPhone> links.
   // When that param is present after login + workorders are loaded, auto-open
-  // the matching workorder in messaging mode.
+  // the matching workorder's messages route.
   useEffect(() => {
     if (deepLinkHandledRef.current) return;
     if (sLoginPhase === "pin") return;
@@ -109,23 +111,14 @@ export function PhoneScreen() {
     deepLinkHandledRef.current = true;
 
     if (match) {
-      _setSelectedWorkorderID(match.id);
-      _setActiveModal("workorderDetail");
-      _setDeepLinkOpenMessages(true);
+      navigate(`/phone/workorder/${match.id}/messages`, { replace: true });
+    } else {
+      navigate(ROUTES.phone, { replace: true });
     }
-
-    navigate("/phone", { replace: true });
   }, [searchParams, zWorkorders, sLoginPhase, navigate]);
 
   function openWorkorder(workorder) {
-    _setSelectedWorkorderID(workorder.id);
-    _setActiveModal("workorderDetail");
-  }
-
-  function closeModal() {
-    _setActiveModal(null);
-    _setSelectedWorkorderID(null);
-    _setDeepLinkOpenMessages(false);
+    navigate(`/phone/workorder/${workorder.id}`);
   }
 
   function handleToggleClock() {
@@ -140,8 +133,6 @@ export function PhoneScreen() {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     useLoginStore.getState().setCurrentUser(null);
     _setLoginPhase("pin");
-    _setActiveModal(null);
-    _setSelectedWorkorderID(null);
     _setPin("");
     _setPinError("");
   }
@@ -198,36 +189,33 @@ export function PhoneScreen() {
 
   const isClockedIn = !!zPunchClock[zCurrentUser?.id];
 
-  if (sActiveModal === "workorderDetail" && selectedWorkorder) {
-    return (
-      <WorkorderDetailModal
-        workorder={selectedWorkorder}
-        zSettings={zSettings}
-        onClose={closeModal}
-        initialShowMessages={sDeepLinkOpenMessages}
-      />
-    );
+  // Sub-route (e.g. /phone/ordering, /phone/workorder/:woID) — render the
+  // matched child once PIN gate is clear.
+  if (subRouteOutlet) {
+    return subRouteOutlet;
   }
 
-  // Sub-route (e.g. /phone/ordering) — render the matched child once PIN +
-  // modal gates are clear.
-  if (subRouteOutlet) return subRouteOutlet;
-
   return (
-    <ListShell
-      workorders={zWorkorders}
-      zStatuses={zStatuses}
-      zSettings={zSettings}
-      currentUser={zCurrentUser}
-      isClockedIn={isClockedIn}
-      search={sSearch}
-      onSearchChange={_setSearch}
-      onToggleClock={handleToggleClock}
-      onSwitchUser={handleSwitchUser}
-      onLogoutApp={handleLogoutApp}
-      onOpenWorkorder={openWorkorder}
-      onOpenOrdering={() => navigate(ROUTES.phoneOrdering)}
-      onActivity={throttledSetLastAction}
-    />
+    <>
+      <ListShell
+        workorders={zWorkorders}
+        zStatuses={zStatuses}
+        zSettings={zSettings}
+        currentUser={zCurrentUser}
+        isClockedIn={isClockedIn}
+        search={sSearch}
+        onSearchChange={_setSearch}
+        onToggleClock={handleToggleClock}
+        onSwitchUser={handleSwitchUser}
+        onLogoutApp={handleLogoutApp}
+        onOpenWorkorder={openWorkorder}
+        onOpenOrdering={() => navigate(ROUTES.phoneOrdering + "?switch=1")}
+        onOpenPrinting={() => _setShowPrinting(true)}
+        onActivity={throttledSetLastAction}
+      />
+      {sShowPrinting && (
+        <PrintingModal onClose={() => _setShowPrinting(false)} />
+      )}
+    </>
   );
 }

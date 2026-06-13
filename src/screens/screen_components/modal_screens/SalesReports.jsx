@@ -21,6 +21,9 @@ import { useActiveSalesStore, useCheckoutStore } from "../../../stores";
 const FullSaleModal = lazy(() =>
   import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
 );
+const TransactionModal = lazy(() =>
+  import("./TransactionModal").then((m) => ({ default: m.TransactionModal }))
+);
 import styles from "./SalesReports.module.css";
 
 const PAGE_SIZE = 50;
@@ -79,6 +82,32 @@ export const SalesReportsModal = ({ handleExit }) => {
   const saleCacheRef = useRef(null);
   const txnCacheRef = useRef(null);
 
+  function fetchTransactionsForRange(startMillis, endMillis) {
+    let cache = txnCacheRef.current;
+    if (cache && startMillis >= cache.startMillis && endMillis <= cache.endMillis) {
+      let filtered = cache.data.filter((tx) => {
+        let m = tx.millis || tx.createdAt || 0;
+        return m >= startMillis && m <= endMillis;
+      });
+      _setTransactionResults(filtered);
+      return;
+    }
+    let thisQueryId = ++txnQueryIdRef.current;
+    _setTransactionLoading(true);
+    queryTransactionsByDateRange(startMillis, endMillis)
+      .then((txns) => {
+        if (thisQueryId !== txnQueryIdRef.current) return;
+        txnCacheRef.current = { startMillis, endMillis, data: txns };
+        _setTransactionResults(txns);
+        _setTransactionLoading(false);
+      })
+      .catch(() => {
+        if (thisQueryId !== txnQueryIdRef.current) return;
+        _setTransactionResults([]);
+        _setTransactionLoading(false);
+      });
+  }
+
   // Fetch data when dates change (with session cache)
   useEffect(() => {
     if (!hasUserSelected.current) return;
@@ -94,35 +123,38 @@ export const SalesReportsModal = ({ handleExit }) => {
         return m >= startMillis && m <= endMillis;
       });
       _setResults(filtered);
-      return;
+    } else {
+      let thisQueryId = ++queryIdRef.current;
+      _setLoading(true);
+
+      let activeSales = useActiveSalesStore.getState().getActiveSales();
+      let filteredActive = activeSales.filter((s) => {
+        let m = s.millis || 0;
+        return m >= startMillis && m <= endMillis;
+      });
+
+      Promise.all([
+        queryCompletedSalesReport(startMillis, endMillis),
+        queryActiveSalesForReport(filteredActive),
+      ])
+        .then(([completedRows, activeRows]) => {
+          if (thisQueryId !== queryIdRef.current) return;
+          let tagged = (completedRows || []).map((r) => ({ ...r, source: "completed" }));
+          let combined = [...tagged, ...(activeRows || [])];
+          saleCacheRef.current = { startMillis, endMillis, data: combined };
+          _setResults(combined);
+          _setLoading(false);
+        })
+        .catch(() => {
+          if (thisQueryId !== queryIdRef.current) return;
+          _setResults([]);
+          _setLoading(false);
+        });
     }
 
-    let thisQueryId = ++queryIdRef.current;
-    _setLoading(true);
-
-    let activeSales = useActiveSalesStore.getState().getActiveSales();
-    let filteredActive = activeSales.filter((s) => {
-      let m = s.millis || 0;
-      return m >= startMillis && m <= endMillis;
-    });
-
-    Promise.all([
-      queryCompletedSalesReport(startMillis, endMillis),
-      queryActiveSalesForReport(filteredActive),
-    ])
-      .then(([completedRows, activeRows]) => {
-        if (thisQueryId !== queryIdRef.current) return;
-        let tagged = (completedRows || []).map((r) => ({ ...r, source: "completed" }));
-        let combined = [...tagged, ...(activeRows || [])];
-        saleCacheRef.current = { startMillis, endMillis, data: combined };
-        _setResults(combined);
-        _setLoading(false);
-      })
-      .catch(() => {
-        if (thisQueryId !== queryIdRef.current) return;
-        _setResults([]);
-        _setLoading(false);
-      });
+    if (sViewMode === "transaction") {
+      fetchTransactionsForRange(startMillis, endMillis);
+    }
   }, [sStartDate, sEndDate]);
 
   function handleCancelQuery() {
@@ -131,6 +163,10 @@ export const SalesReportsModal = ({ handleExit }) => {
   }
 
   function handleRowPress(tx) {
+    if (sViewMode === "transaction") {
+      _setTransactionModalItem(tx);
+      return;
+    }
     if (!tx.saleID) {
       _setTransactionModalItem(tx);
       return;
@@ -151,6 +187,13 @@ export const SalesReportsModal = ({ handleExit }) => {
     _setSaleModalItem(null);
     handleExit();
     useCheckoutStore.getState().setStringOnly(saleID);
+  }
+
+  function handleRefundFromTransactionModal(txn) {
+    if (!txn?.saleID) return;
+    _setTransactionModalItem(null);
+    handleExit();
+    useCheckoutStore.getState().setStringOnly(txn.saleID);
   }
 
   function handleHeaderSort(field) {
@@ -195,31 +238,7 @@ export const SalesReportsModal = ({ handleExit }) => {
     if (!sStartDate || !sEndDate) return;
     let startMillis = dayjs(sStartDate).startOf("day").valueOf();
     let endMillis = dayjs(sEndDate).endOf("day").valueOf();
-
-    let cache = txnCacheRef.current;
-    if (cache && startMillis >= cache.startMillis && endMillis <= cache.endMillis) {
-      let filtered = cache.data.filter((tx) => {
-        let m = tx.millis || tx.createdAt || 0;
-        return m >= startMillis && m <= endMillis;
-      });
-      _setTransactionResults(filtered);
-      return;
-    }
-
-    let thisQueryId = ++txnQueryIdRef.current;
-    _setTransactionLoading(true);
-    queryTransactionsByDateRange(startMillis, endMillis)
-      .then((txns) => {
-        if (thisQueryId !== txnQueryIdRef.current) return;
-        txnCacheRef.current = { startMillis, endMillis, data: txns };
-        _setTransactionResults(txns);
-        _setTransactionLoading(false);
-      })
-      .catch(() => {
-        if (thisQueryId !== txnQueryIdRef.current) return;
-        _setTransactionResults([]);
-        _setTransactionLoading(false);
-      });
+    fetchTransactionsForRange(startMillis, endMillis);
   }
 
   let displayStart = sPendingStart || sStartDate;
@@ -932,85 +951,15 @@ export const SalesReportsModal = ({ handleExit }) => {
 
       {/* Transaction Viewer Modal (nested) */}
       {!!sTransactionModalItem && (
-        <TransactionViewerModal
-          tx={sTransactionModalItem}
-          onClose={() => _setTransactionModalItem(null)}
-        />
+        <Suspense fallback={<LoadingIndicator />}>
+          <TransactionModal
+            transaction={sTransactionModalItem}
+            onClose={() => _setTransactionModalItem(null)}
+            onRefund={handleRefundFromTransactionModal}
+          />
+        </Suspense>
       )}
     </>
-  );
-};
-
-const TransactionViewerModal = ({ tx, onClose }) => {
-  if (!tx) return null;
-
-  let isRefund = tx.type === "refund";
-  let dateStr = "";
-  if (tx.millis) {
-    let d = formatMillisForDisplay(tx.millis, true, true, true);
-    let min = String(d.minutes).padStart(2, "0");
-    dateStr = d.wordDayOfWeek + ", " + d.wordDayOfMonth + " " + d.dayOfMonth + " " + d.year + "  " + d.hour + ":" + min + " " + d.amPM;
-  }
-
-  let rows = [
-    { label: "Type", value: capitalizeFirstLetterOfString(tx.type || "payment") },
-    { label: "Method", value: capitalizeFirstLetterOfString(tx.method || "") },
-    {
-      label: "Amount",
-      value: (isRefund ? "-" : "") + "$" + formatCurrencyDisp(tx.amountCaptured || 0),
-      color: isRefund ? C.lightred : C.text,
-    },
-    { label: "Date", value: dateStr },
-  ];
-  if (tx.method === "card") {
-    if (tx.cardType || tx.last4) rows.push({ label: "Card", value: (tx.cardType || "Card") + (tx.last4 ? "  ..." + tx.last4 : "") });
-    if (tx.cardIssuer) rows.push({ label: "Issuer", value: tx.cardIssuer });
-    if (tx.expMonth && tx.expYear) rows.push({ label: "Exp", value: tx.expMonth + "/" + tx.expYear });
-    if (tx.authorizationCode) rows.push({ label: "Auth Code", value: tx.authorizationCode });
-    if (tx.chargeID) rows.push({ label: "Charge ID", value: tx.chargeID });
-  }
-  if (tx.method === "cash" && tx.amountTendered) rows.push({ label: "Tendered", value: "$" + formatCurrencyDisp(tx.amountTendered) });
-  if (tx.id) rows.push({ label: "Transaction ID", value: tx.id });
-
-  return (
-    <Dialog
-      visible={true}
-      onClose={onClose}
-      overlayColor={C.surfaceOverlay}
-    >
-      <div className={styles.txModalCard}>
-        <LargeModalHeader
-          title="Transaction Details"
-          actions={
-            <LargeModalHeaderButton variant="default" onClick={onClose}>
-              CLOSE
-            </LargeModalHeaderButton>
-          }
-        />
-        <div className={styles.txModalBody}>
-          {rows.map((row, idx) => {
-            let isLast = idx === rows.length - 1;
-            return (
-              <div
-                key={idx}
-                className={`${styles.txModalRow} ${isLast ? styles.txModalRowLast : ""}`}
-                style={{ borderBottomColor: C.borderSubtle }}
-              >
-                <span className={styles.txModalLabel} style={{ color: C.textMuted }}>
-                  {row.label}
-                </span>
-                <span
-                  className={styles.txModalValue}
-                  style={{ color: row.color || C.text }}
-                >
-                  {row.value}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </Dialog>
   );
 };
 

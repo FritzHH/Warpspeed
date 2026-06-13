@@ -343,19 +343,30 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
   }
 
   async function handleRevive() {
-    const result = await newCheckoutUnarchiveWorkorder(workorder);
-    if (!result?.success) {
-      useAlertScreenStore.getState().setValues({
-        title: "Revive Failed",
-        message: "Could not move the workorder back into the open list. Please try again.",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
-        canExitOnOuterClick: true,
-      });
-      return;
-    }
-    useOpenWorkordersStore.getState().setWorkorder(workorder, false);
-    onClose && onClose();
+    useAlertScreenStore.getState().setValues({
+      title: "Revive Workorder?",
+      message: "This workorder will be moved back into the Open Workorders list with \"Finished & Paid\" status, and will appear on the main dashboard alongside other active tickets.",
+      btn1Text: "Revive",
+      handleBtn1Press: async () => {
+        useAlertScreenStore.getState().setShowAlert(false);
+        const result = await newCheckoutUnarchiveWorkorder(workorder);
+        if (!result?.success) {
+          useAlertScreenStore.getState().setValues({
+            title: "Revive Failed",
+            message: "Could not move the workorder back into the open list. Please try again.",
+            btn1Text: "OK",
+            handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+            canExitOnOuterClick: true,
+          });
+          return;
+        }
+        useOpenWorkordersStore.getState().setWorkorder(workorder, false);
+        onClose && onClose();
+      },
+      btn2Text: "Cancel",
+      handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+      canExitOnOuterClick: true,
+    });
   }
 
   function handlePrintWorkorder() {

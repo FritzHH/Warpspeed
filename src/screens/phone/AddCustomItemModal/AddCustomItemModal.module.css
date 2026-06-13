@@ -1,0 +1,262 @@
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--surface-base);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  background-color: var(--surface-accent-muted);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--border-default);
+  flex-shrink: 0;
+}
+
+.headerBtn {
+  padding: 6px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-default);
+  margin-left: 8px;
+}
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px 24px 14px;
+  box-sizing: border-box;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  margin-top: 12px;
+}
+
+.fieldLabel:first-child {
+  margin-top: 0;
+}
+
+.input {
+  width: 100%;
+  height: 44px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  border-radius: var(--radius-control);
+  padding-left: 12px;
+  padding-right: 12px;
+  font-size: 16px;
+  background-color: var(--surface-raised);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.priceWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 44px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-raised);
+  padding-left: 12px;
+  padding-right: 12px;
+  box-sizing: border-box;
+}
+
+.priceCurrency {
+  font-size: 18px;
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+
+.priceInput {
+  flex: 1;
+  height: 100%;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  background-color: transparent;
+  min-width: 0;
+}
+
+.textarea {
+  width: 100%;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 16px;
+  background-color: var(--surface-raised);
+  outline: none;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  min-height: 72px;
+}
+
+.discountTrigger {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  border-radius: var(--radius-control);
+  padding-left: 12px;
+  padding-right: 12px;
+  background-color: var(--surface-raised);
+  cursor: pointer;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.discountTriggerDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.discountTriggerLabel {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.discountTriggerLabelActive {
+  color: var(--text-default);
+  font-weight: 600;
+}
+
+.discountCaret {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.discountPreview {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: var(--surface-success-muted);
+  border-radius: var(--radius-row);
+}
+
+.discountPreviewOld {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.discountPreviewNew {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.discountPreviewBadge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-left: auto;
+}
+
+.discountPanel {
+  margin-top: 8px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-raised);
+  overflow: hidden;
+}
+
+.discountRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-left: 14px;
+  padding-right: 14px;
+  background: none;
+  border: none;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--border-subtle);
+  font-size: 16px;
+  color: var(--text-default);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.discountDivider {
+  height: 1px;
+  background-color: var(--border-default);
+}
+
+.customRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 10px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: var(--border-subtle);
+}
+
+.customRow:last-child {
+  border-bottom: none;
+}
+
+.customLabel {
+  font-size: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.customInput {
+  flex: 1;
+  height: 40px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  border-radius: var(--radius-control);
+  padding-left: 10px;
+  padding-right: 10px;
+  font-size: 16px;
+  background-color: var(--surface-base);
+  outline: none;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.customCheckBtn {
+  padding: 8px;
+}

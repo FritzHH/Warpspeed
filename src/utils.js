@@ -311,10 +311,15 @@ export function searchInventory(query, items) {
     { key: "brand", weight: 1.0 },
     { key: "category", weight: 1.0 },
     { key: "quickButtonLabel", weight: 1.0 },
+    { key: "vendorPartId", weight: 1.0 },
   ];
 
-  // Identifier fields — exact match only
-  const ID_FIELDS = ["upc", "ean", "customSku", "manufacturerSku"];
+  // Identifier string fields — exact match returns 0.95
+  const ID_STRING_FIELDS = ["vendorPartId", "primaryBarcode", "upc", "ean", "customSku", "manufacturerSku"];
+
+  // Identifier-shaped queries (no spaces + contains a digit) skip Tier 5 fuzzy
+  // so digit-heavy queries don't pick up fuzzy noise on text fields.
+  const skipFuzzy = !/\s/.test(queryNorm) && /\d/.test(queryNorm);
 
   // Score a single term against a single field value
   function scoreTerm(term, fieldVal) {
@@ -343,8 +348,8 @@ export function searchInventory(query, items) {
       return 0.75 + positionBonus;
     }
 
-    // Tier 5: fuzzy — only for terms 3+ chars
-    if (term.length >= 3) {
+    // Tier 5: fuzzy — only for terms 3+ chars, and skipped for identifier-shaped queries
+    if (term.length >= 3 && !skipFuzzy) {
       let bestFuzzy = 0;
       for (const word of words) {
         if (word.length < 2) continue;
@@ -372,9 +377,19 @@ export function searchInventory(query, items) {
   function scoreItem(item) {
     // Check identifier fields first — exact match is an instant high score
     const queryNoSpaces = queryNorm.replace(/\s/g, "");
-    for (const key of ID_FIELDS) {
+    for (const key of ID_STRING_FIELDS) {
       const val = norm(item[key]);
       if (val && val === queryNoSpaces) return 0.95;
+    }
+    if (Array.isArray(item.barcodes)) {
+      for (const bc of item.barcodes) {
+        if (norm(bc) === queryNoSpaces) return 0.95;
+      }
+    }
+    if (Array.isArray(item.alternateVendors)) {
+      for (const av of item.alternateVendors) {
+        if (av && norm(av.vendorPartId) === queryNoSpaces) return 0.95;
+      }
     }
 
     // Score each term across weighted fields

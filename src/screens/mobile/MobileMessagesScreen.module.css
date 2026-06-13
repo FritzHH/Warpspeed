@@ -36,9 +36,30 @@
   flex-shrink: 0;
 }
 
+.backLabelBtn {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.backLabelText {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.backLabelSpacer {
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
 .headerTextWrap {
   display: flex;
   flex-direction: column;
+  align-items: center;
   flex: 1;
   min-width: 0;
 }
@@ -70,6 +91,8 @@
   padding-top: 8px;
   padding-bottom: 8px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .emptyState {
@@ -96,7 +119,7 @@
   background-color: var(--surface-raised);
   padding-left: 12px;
   padding-right: 12px;
-  padding-bottom: 10px;
+  padding-bottom: 24px;
   flex-shrink: 0;
 }
 
@@ -151,24 +174,25 @@
 .inputRow {
   display: flex;
   flex-direction: row;
-  align-items: flex-end;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-strong);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-base);
+  flex-shrink: 0;
 }
 
 .textInput {
   flex: 1;
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border-strong);
-  border-radius: var(--radius-container);
-  padding-left: 14px;
-  padding-right: 14px;
-  padding-top: 10px;
-  padding-bottom: 10px;
-  font-size: 16px;
-  line-height: 20px;
+  border: none;
   outline: none;
-  background-color: var(--surface-base);
   resize: none;
+  background: transparent;
+  padding: 8px 4px 8px 12px;
+  margin: 0;
+  font-size: 18px;
+  line-height: 22px;
   font-family: inherit;
   min-height: 36px;
   max-height: 140px;
@@ -176,33 +200,21 @@
   box-sizing: border-box;
 }
 
-.sendBtn {
-  margin-left: 10px;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-container);
+.sendColumn {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  border: none;
-  cursor: pointer;
+  justify-content: flex-end;
   flex-shrink: 0;
 }
 
-.sendBtnEnabled {
-  background-color: var(--info);
-}
-
-.sendBtnDisabled {
-  background-color: var(--border-subtle);
-  cursor: default;
-}
-
-.sendBtnIcon {
-  color: var(--text-on-accent);
-  font-size: 18px;
-  font-weight: 700;
-  margin-left: 2px;
+.sendButton {
+  margin-right: 4px;
+  margin-bottom: 2px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .notFoundWrap {
@@ -244,6 +256,18 @@
   padding-right: 12px;
   padding-top: 8px;
   padding-bottom: 8px;
+  position: relative;
+}
+
+.bubbleIncoming::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid var(--surface-alt);
+  border-left: 8px solid transparent;
 }
 
 .bubbleOutgoingNormal {
@@ -254,6 +278,18 @@
   padding-right: 12px;
   padding-top: 8px;
   padding-bottom: 8px;
+  position: relative;
+}
+
+.bubbleOutgoingNormal::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid rgb(0, 122, 255);
+  border-right: 8px solid transparent;
 }
 
 .bubbleOutgoingFailed {
@@ -264,6 +300,18 @@
   padding-right: 12px;
   padding-top: 8px;
   padding-bottom: 8px;
+  position: relative;
+}
+
+.bubbleOutgoingFailed::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid rgb(200, 80, 80);
+  border-right: 8px solid transparent;
 }
 
 .bubbleTextIncoming {

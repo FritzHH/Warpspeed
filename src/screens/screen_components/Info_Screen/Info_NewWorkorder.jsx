@@ -314,7 +314,7 @@ export function NewWorkorderComponent({}) {
     }
   }
 
-  function handleCreateCustomerBtnPressed() {
+  const handleCreateCustomerBtnPressed = useGatedAction(() => {
     let custInfo = cloneDeep(CUSTOMER_PROTO);
     if (sSearchFieldName === "phone") {
       custInfo.customerCell = removeDashesFromPhone(sTextInput);
@@ -329,7 +329,7 @@ export function NewWorkorderComponent({}) {
     }
     // do not set the customer id this is how the next screen knows it is a new customer. we will set the id in the modal automatically on creation
     _setCustomerInfo(custInfo);
-  }
+  });
 
   const handleStartStandaloneSalePress = useGatedAction(async () => {
     useCurrentCustomerStore.getState().setCustomer(null, false);

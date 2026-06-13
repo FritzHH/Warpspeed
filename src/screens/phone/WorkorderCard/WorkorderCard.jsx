@@ -1,16 +1,15 @@
-import { ICONS, C } from "../../../styles";
+import { C } from "../../../styles";
 import {
   resolveStatus,
   capitalizeFirstLetterOfString,
   formatMillisForDisplay,
 } from "../../../utils";
-import { Image } from "../../../dom_components";
 import {
   computeWaitInfo,
   formatPickupDeliveryTime,
   MONTH_LABELS_SHORT,
   DAY_LABELS_SHORT,
-} from "../helpers";
+} from "../../../shared/workordersList";
 import styles from "./WorkorderCard.module.css";
 
 const TEXT_COLOR = C.textDefault;
@@ -139,8 +138,9 @@ export function WorkorderCard({ workorder, zStatuses, onPress }) {
             <div />
           )}
           {waitInfo.isMissing ? (
-            <div className={styles.waitBadge}>
-              <Image icon={ICONS.questionMark} size={16} />
+            <div className={styles.waitBadgeStacked}>
+              <span className={styles.waitDayItalic} style={{ color: "red" }}>Needs</span>
+              <span className={styles.waitDayLine} style={{ color: "red" }}>Estimate</span>
             </div>
           ) : !!waitInfo.waitEndDay && waitInfo.waitEndDay.includes("\n") ? (
             <div className={styles.waitBadgeStacked}>

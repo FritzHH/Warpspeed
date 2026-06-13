@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
-import { SmallLoadingIndicator, TouchableOpacity } from "../../../dom_components";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Image, SmallLoadingIndicator, Toast, TouchableOpacity } from "../../../dom_components";
+import { ICONS } from "../../../styles";
 import styles from "./VideoRecorder.module.css";
 
-const MAX_DURATION = 120;
+const MAX_DURATION = 30;
 
 export function VideoRecorder({ onComplete, onCancel }) {
   const videoRef = useRef(null);
@@ -19,11 +20,25 @@ export function VideoRecorder({ onComplete, onCancel }) {
   const [sMimeType, _setMimeType] = useState("");
   const [sSeconds, _setSeconds] = useState(0);
   const [sError, _setError] = useState("");
+  const [sHitLimit, _setHitLimit] = useState(false);
+  const [sSwipeX, _setSwipeX] = useState(0);
+  const [sSwiping, _setSwiping] = useState(false);
+  const [sShowHintToast, _setShowHintToast] = useState(true);
+  const swipeStartRef = useRef(null);
 
   if (!initRef.current) {
     initRef.current = true;
     initCamera();
   }
+
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      clearInterval(timerRef.current);
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
+  }, []);
 
   async function initCamera() {
     try {
@@ -54,6 +69,7 @@ export function VideoRecorder({ onComplete, onCancel }) {
     try {
       chunksRef.current = [];
       _setSeconds(0);
+      _setHitLimit(false);
       const options = { videoBitsPerSecond: 1500000 };
       if (sMimeType) options.mimeType = sMimeType;
       const recorder = new MediaRecorder(streamRef.current, options);
@@ -77,6 +93,7 @@ export function VideoRecorder({ onComplete, onCancel }) {
         _setSeconds((prev) => {
           if (prev + 1 >= MAX_DURATION) {
             recorder.stop();
+            _setHitLimit(true);
             return prev + 1;
           }
           return prev + 1;
@@ -127,18 +144,68 @@ export function VideoRecorder({ onComplete, onCancel }) {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
   }
 
+  const setVideoEl = useCallback((el) => {
+    videoRef.current = el;
+    if (el && streamRef.current && el.srcObject !== streamRef.current) {
+      el.srcObject = streamRef.current;
+    }
+  }, []);
+
   function formatTime(sec) {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
   }
 
+  const swipeHandlers = {
+    onTouchStart: (e) => {
+      const t = e.touches[0];
+      if (t.clientX > 30) return;
+      e.stopPropagation();
+      swipeStartRef.current = { x: t.clientX, time: Date.now() };
+      _setSwiping(true);
+    },
+    onTouchMove: (e) => {
+      if (!swipeStartRef.current) return;
+      e.stopPropagation();
+      const t = e.touches[0];
+      const dx = t.clientX - swipeStartRef.current.x;
+      if (dx > 0) _setSwipeX(dx);
+    },
+    onTouchEnd: (e) => {
+      if (!swipeStartRef.current) return;
+      e.stopPropagation();
+      const elapsed = Date.now() - swipeStartRef.current.time;
+      const velocity = sSwipeX / Math.max(elapsed, 1);
+      const commitThreshold = window.innerWidth * 0.3;
+      const isCommit = sSwipeX > commitThreshold || velocity > 0.5;
+      swipeStartRef.current = null;
+      _setSwiping(false);
+      if (isCommit) {
+        _setSwipeX(window.innerWidth);
+        setTimeout(() => { handleCancel(); _setSwipeX(0); }, 200);
+      } else {
+        _setSwipeX(0);
+      }
+    },
+  };
+
+  const swipeStyle = {
+    transform: `translateX(${sSwipeX}px)`,
+    transition: sSwiping ? "none" : "transform 200ms ease",
+  };
+
   return (
-    <div className={styles.root}>
+    <div className={styles.root} {...swipeHandlers} style={swipeStyle}>
+      <Toast
+        text="Swipe left to close"
+        visible={sShowHintToast}
+        duration={1500}
+        position="middle"
+        onHide={() => _setShowHintToast(false)}
+      />
       <div className={styles.topBar}>
-        <TouchableOpacity onPress={handleCancel} className={styles.closeBtn} aria-label="Cancel">
-          <span className={styles.closeIcon}>{"\u2715"}</span>
-        </TouchableOpacity>
+        <div className={styles.topSpacer} />
         {sPhase === "recording" && (
           <div className={styles.timerRow}>
             <div className={styles.timerDot} />
@@ -151,26 +218,54 @@ export function VideoRecorder({ onComplete, onCancel }) {
         <div className={styles.topSpacer} />
       </div>
 
+      {sPhase === "preview" && (
+        <div className={styles.previewActions}>
+          <TouchableOpacity
+            onPress={handleReRecord}
+            className={styles.reRecordBtn}
+            aria-label="Re-record"
+          >
+            <Image icon={ICONS.camera} size={67} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleUse}
+            className={styles.useBtn}
+            aria-label="Use Video"
+          >
+            <Image icon={ICONS.check1} size={62} />
+          </TouchableOpacity>
+        </div>
+      )}
+
       <div className={styles.body}>
         {sPhase === "error" ? (
           <div className={styles.errorBox}>
             <span className={styles.errorText}>{sError}</span>
           </div>
         ) : sPhase === "preview" && sPreviewUrl ? (
-          <video
-            src={sPreviewUrl}
-            controls
-            autoPlay
-            playsInline
-            className={styles.videoPreview}
-          />
+          <>
+            {sHitLimit && (
+              <div className={styles.limitBanner}>
+                <span className={styles.limitBannerText}>
+                  30 second limit reached
+                </span>
+              </div>
+            )}
+            <video
+              src={sPreviewUrl}
+              controls
+              autoPlay
+              playsInline
+              className={styles.videoPreview}
+              onLoadedData={(e) => {
+                e.target.play().catch(() => {});
+              }}
+            />
+          </>
         ) : (
           <>
             <video
-              ref={(el) => {
-                videoRef.current = el;
-                if (el && streamRef.current) el.srcObject = streamRef.current;
-              }}
+              ref={setVideoEl}
               autoPlay
               playsInline
               muted
@@ -200,16 +295,6 @@ export function VideoRecorder({ onComplete, onCancel }) {
               <div className={styles.stopSquare} />
             </div>
           </TouchableOpacity>
-        )}
-        {sPhase === "preview" && (
-          <div className={styles.previewActions}>
-            <TouchableOpacity onPress={handleReRecord} className={styles.reRecordBtn}>
-              <span className={styles.btnText}>Re-record</span>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleUse} className={styles.useBtn}>
-              <span className={styles.btnText}>Use Video</span>
-            </TouchableOpacity>
-          </div>
         )}
         {sPhase === "error" && (
           <TouchableOpacity onPress={handleCancel} className={styles.errorBtn}>

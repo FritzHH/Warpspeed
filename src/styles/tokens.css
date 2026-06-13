@@ -78,7 +78,8 @@
   --surface-raised:         rgb(255, 255, 255);
   --surface-accent-muted:   rgb(232, 239, 245);  /* matches existing C.buttonLightGreen */
   --surface-success-muted:  var(--brand-50);
-  --surface-warning-muted:  rgb(255, 248, 230);  /* amber warning banner bg */
+  --surface-info-muted:     rgb(230, 240, 251);  /* pale blue wash for info severity */
+  --surface-warning-muted:  rgb(255, 243, 220);  /* amber warning wash */
   --surface-overlay:        rgba(0, 0, 0, 0.5);  /* modal scrim - 76 inline uses */
   --surface-overlay-light:  rgba(0, 0, 0, 0.1);
   --surface-overlay-medium: rgba(0, 0, 0, 0.3);
@@ -185,6 +186,7 @@
   --surface-raised:         var(--gray-800);
   --surface-accent-muted:   var(--brand-800);
   --surface-success-muted:  var(--brand-800);
+  --surface-info-muted:     rgb(20, 35, 55);
   --surface-warning-muted:  rgb(60, 45, 15);
   --surface-overlay:        rgba(0, 0, 0, 0.7);
   --surface-overlay-light:  rgba(0, 0, 0, 0.3);

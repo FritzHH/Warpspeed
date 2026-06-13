@@ -2,7 +2,7 @@ import { ICONS, C, Radius } from "../../../styles";
 import { Image, DropdownMenu, TouchableOpacity, AlertBox } from "../../../dom_components";
 import { useAlertScreenStore } from "../../../stores";
 import { WorkorderCard } from "../WorkorderCard/WorkorderCard";
-import { sortWorkorders } from "../helpers";
+import { sortWorkorders } from "../../../shared/workordersList";
 import styles from "./ListShell.module.css";
 
 const USER_DROPDOWN_BUTTON_STYLE = {
@@ -15,7 +15,7 @@ const USER_DROPDOWN_BUTTON_STYLE = {
 };
 
 const USER_DROPDOWN_TEXT_STYLE = {
-  fontSize: 13,
+  fontSize: 18,
   color: C.textDefault,
 };
 
@@ -25,6 +25,10 @@ const HAMBURGER_BUTTON_STYLE = {
   borderWidth: 0,
   backgroundColor: C.surfaceAccentMuted,
   borderRadius: Radius.control,
+};
+
+const HAMBURGER_ITEM_TEXT_STYLE = {
+  fontSize: 20,
 };
 
 export function ListShell({
@@ -40,6 +44,7 @@ export function ListShell({
   onLogoutApp,
   onOpenWorkorder,
   onOpenOrdering,
+  onOpenPrinting,
   onActivity,
 }) {
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
@@ -51,7 +56,9 @@ export function ListShell({
       const q = search.trim().toLowerCase();
       const fields = [wo.customerFirst, wo.customerLast, wo.brand, wo.description];
       return fields.some((f) => f && f.toLowerCase().includes(q));
-    })
+    }),
+    zStatuses || [],
+    currentUser
   );
 
   const userLabel =
@@ -77,6 +84,7 @@ export function ListShell({
             buttonText={userLabel}
             buttonStyle={USER_DROPDOWN_BUTTON_STYLE}
             buttonTextStyle={USER_DROPDOWN_TEXT_STYLE}
+            itemTextStyle={HAMBURGER_ITEM_TEXT_STYLE}
             dataArr={[
               { label: isClockedIn ? "Clock Out" : "Clock In" },
               { label: "Switch User" },
@@ -92,11 +100,13 @@ export function ListShell({
         <div className={styles.headerSlot}>
           <DropdownMenu
             buttonIcon={ICONS.menu2}
-            buttonIconSize={21}
+            buttonIconSize={26}
             buttonStyle={HAMBURGER_BUTTON_STYLE}
-            dataArr={[{ label: "Ordering" }]}
+            itemTextStyle={HAMBURGER_ITEM_TEXT_STYLE}
+            dataArr={[{ label: "Ordering" }, { label: "Printing" }]}
             onSelect={(item) => {
               if (item.label === "Ordering") onOpenOrdering?.();
+              else if (item.label === "Printing") onOpenPrinting?.();
             }}
           />
         </div>

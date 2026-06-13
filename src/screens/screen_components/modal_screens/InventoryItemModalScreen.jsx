@@ -17,12 +17,14 @@ import {
   DropdownMenu,
   Image,
   LoginModal,
+  ModalFooter,
+  ModalFooterButton,
   TextInput,
   Tooltip,
   LargeModalHeader,
   LargeModalHeaderButton,
 } from "../../../dom_components";
-import { C, ICONS, Radius } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../styles";
 import styles from "./InventoryItemModalScreen.module.css";
 import { formatCurrencyDisp, showAlert, deepEqual, localStorageWrapper, generate36CharUUID } from "../../../utils";
 import {
@@ -33,8 +35,9 @@ import {
   dbListenToVendorOrderItems,
   dbSaveVendorOrderItem,
 } from "../../../db_calls_wrapper";
-import { VENDOR_ORDER_ITEM_PROTO } from "../../../data";
+import { VENDOR_CATALOGS, VENDOR_ORDER_ITEM_PROTO, WORKORDER_PROTO } from "../../../data";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
+import { printBuilder } from "../../../shared/printBuilder";
 const QuickButtonPickerModal = lazy(() =>
   import("./QuickButtonPickerModal").then((m) => ({ default: m.QuickButtonPickerModal }))
 );
@@ -151,7 +154,11 @@ function getButtonsContainingItem(itemID, allButtons) {
 
 // ─── main component ────────────────────────────────────────────────────────
 
-export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
+export const InventoryItemModalScreen = ({ item, isNew, isCatalogImport, handleExit, onImported, onChanged }) => {
+  console.log("InventoryItemModalScreen raw item:", JSON.stringify(item, null, 2));
+  // Catalog import treats the modal as a draft: nothing is written until the
+  // operator clicks IMPORT ITEM. Same auto-save suppression as `isNew`.
+  const isDraft = isNew || isCatalogImport;
   const zQuickItemButtons = useSettingsStore((s) => s.settings?.quickItemButtons, deepEqual);
   const zAutoCustomerNoteTexts = useSettingsStore((s) => s.settings?.autoCustomerNoteTexts, deepEqual);
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
@@ -163,7 +170,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     return cloned;
   });
   const userLevel = useLoginStore.getState().currentUser?.permissions?.level || 0;
-  const [sEditing, _setEditing] = useState(!!isNew || userLevel >= 2);
+  const [sEditing, _setEditing] = useState(!!isDraft || userLevel >= 2);
   const [sShowQBPicker, _setShowQBPicker] = useState(false);
   const [sDirty, _setDirty] = useState(false);
   const [sPrintSuccess, _setPrintSuccess] = useState(false);
@@ -171,6 +178,10 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   const [sOpenOrders, _setOpenOrders] = useState([]);
   const [sOrderItemCounts, _setOrderItemCounts] = useState({});
   const [sAddToOrderOpen, _setAddToOrderOpen] = useState(false);
+  const [sShowSpecs, _setShowSpecs] = useState(false);
+  const [sShowDevCustomEntry, _setShowDevCustomEntry] = useState(false);
+  const [sDevCustomBarcode, _setDevCustomBarcode] = useState("");
+  const [sDevCustomError, _setDevCustomError] = useState("");
 
   useEffect(() => {
     const unsub = dbListenToVendorOrders((data) => {
@@ -259,7 +270,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     let updated = { ...sItem, [fieldName]: value };
     _setItem(updated);
     _setDirty(true);
-    if (!isNew) {
+    if (!isDraft) {
       useInventoryStore.getState().setItem(updated, false);
       debouncedInvSaveRef.current(updated);
     }
@@ -277,6 +288,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
       else updatedArr.push(entry);
       useSettingsStore.getState().setField("autoCustomerNoteTexts", updatedArr);
     }
+    if (isCatalogImport && typeof onImported === "function") onImported(sItem);
+    if (typeof onChanged === "function") onChanged();
     handleExit();
   }
 
@@ -285,7 +298,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     if (fieldName === "price" && cents > 0) updated.minutes = 0;
     _setItem(updated);
     _setDirty(true);
-    if (!isNew) {
+    if (!isDraft) {
       useInventoryStore.getState().setItem(updated, false);
       debouncedInvSaveRef.current(updated);
     }
@@ -304,7 +317,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     }
     _setItem(updated);
     _setDirty(true);
-    if (!isNew) {
+    if (!isDraft) {
       useInventoryStore.getState().setItem(updated, false);
       debouncedInvSaveRef.current(updated);
     }
@@ -327,6 +340,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           }
           useInventoryStore.getState().removeItem(sItem);
           dbDeleteInventoryItem(sItem.id);
+          if (typeof onChanged === "function") onChanged();
           handleExit();
         });
       },
@@ -393,6 +407,100 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     dbSavePrintObj(printJob, printerID);
     _setPrintSuccess(true);
     setTimeout(() => _setPrintSuccess(false), 2000);
+  }
+
+  // ─── DEV: spoofed thermal print for scanner testing ───────────────────
+  function _devPrintSpoofedThermal(barcode) {
+    let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
+    if (!printerID) {
+      showAlert({
+        title: "No Thermal Printer",
+        message: "Select a thermal printer for this device in Settings.",
+        btn1Text: "OK",
+      });
+      return;
+    }
+    const _settings = useSettingsStore.getState().getSettings();
+    const _currentUser = useLoginStore.getState().getCurrentUser?.() || {};
+    const itemDisplay = sItem.catalogName || sItem.formalName || "Test item";
+    const spoofedWO = {
+      ...cloneDeep(WORKORDER_PROTO),
+      id: "dev_" + Date.now().toString(36),
+      customerFirst: "Test",
+      customerLast: "Customer",
+      startedOnMillis: Date.now(),
+      status: "newly_created",
+      workorderLines: [
+        {
+          id: "devLine_" + Date.now().toString(36),
+          qty: 1,
+          intakeNotes: "",
+          receiptNotes: "",
+          discountObj: "",
+          useSalePrice: false,
+          warranty: false,
+          inventoryItem: {
+            catalogName: "DEV: " + itemDisplay,
+            price: 0,
+            salePrice: 0,
+          },
+        },
+      ],
+    };
+    const spoofedCustomer = {
+      first: "Test",
+      last: "Customer",
+      customerCell: "",
+      customerLandline: "",
+      email: "",
+    };
+    const toPrint = printBuilder.workorder(
+      spoofedWO,
+      spoofedCustomer,
+      _settings?.salesTaxPercent || 0,
+      { currentUser: _currentUser, settings: _settings },
+    );
+    toPrint.barcode = String(barcode);
+    dbSavePrintObj(toPrint, printerID);
+    _setPrintSuccess(true);
+    setTimeout(() => _setPrintSuccess(false), 2000);
+  }
+
+  function handleDevPrintThermal() {
+    const itemUpc =
+      sItem.primaryBarcode ||
+      (Array.isArray(sItem.barcodes) ? sItem.barcodes[0] : "") ||
+      "";
+    if (!itemUpc) {
+      showAlert({
+        title: "No Item Barcode",
+        message: "This inventory item has no UPC/barcode to print.",
+        btn1Text: "OK",
+      });
+      return;
+    }
+    _devPrintSpoofedThermal(itemUpc);
+  }
+
+  function handleDevPrintCustomOpen() {
+    _setDevCustomBarcode("");
+    _setDevCustomError("");
+    _setShowDevCustomEntry(true);
+  }
+
+  function handleDevPrintCustomClose() {
+    _setShowDevCustomEntry(false);
+    _setDevCustomError("");
+  }
+
+  function handleDevPrintCustomConfirm() {
+    const raw = (sDevCustomBarcode || "").replace(/[^0-9]/g, "");
+    if (raw.length !== 12 && raw.length !== 13) {
+      _setDevCustomError("Enter exactly 12 or 13 digits.");
+      return;
+    }
+    _devPrintSpoofedThermal(raw);
+    _setShowDevCustomEntry(false);
   }
 
   // ─── quick button helpers ──────────────────────────────────────────────
@@ -499,7 +607,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           )
         ) : (
           <span
-            className={`${styles.fieldValue}${opts.multiline ? " " + styles.fieldValueMultiline : ""}`}
+            className={`${styles.fieldValue}${(opts.multiline || opts.viewMultiline) ? " " + styles.fieldValueMultiline : ""}`}
             style={{ color: C.text }}
           >
             {String(val ?? "-")}
@@ -520,10 +628,16 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           {zShowLoginScreen && <LoginModal modalVisible={true} />}
 
           <LargeModalHeader
-            title={isNew ? "New Inventory Item" : "Inventory Item"}
+            title={
+              isCatalogImport
+                ? "Import From Catalog"
+                : isNew
+                  ? "New Inventory Item"
+                  : "Inventory Item"
+            }
             iconSize={22}
             actions={[
-              !isNew && (
+              !isDraft && (
                 sOpenOrders.length === 0 ? (
                   <LargeModalHeaderButton
                     key="addToOrder"
@@ -634,7 +748,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   </PrintActionSlot>
                 )
               ),
-              !isNew && (
+              !isDraft && (
                 <LargeModalHeaderButton
                   key="delete"
                   variant="danger"
@@ -644,7 +758,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   onClick={handleDeleteItem}
                 />
               ),
-              !isNew && templateEntries.length > 0 && (
+              !isDraft && (templateEntries.length > 0 || import.meta.env.DEV) && (
                 <PrintActionSlot
                   key="print"
                   style={{ width: 44, height: 44, position: "relative", flexShrink: 0 }}
@@ -653,16 +767,27 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                     <DropdownMenu
                       portal
                       dataArr={[
-                        {
-                          component: (
-                            <QtyStepper value={sPrintQty} onChange={_setPrintQty} />
-                          ),
-                        },
-                        { _isDivider: true },
-                        ...templateEntries.map(([slug, t]) => ({ label: t.name, slug })),
+                        ...(templateEntries.length > 0
+                          ? [
+                              { component: <QtyStepper value={sPrintQty} onChange={_setPrintQty} /> },
+                              { _isDivider: true },
+                              ...templateEntries.map(([slug, t]) => ({ label: t.name, slug })),
+                            ]
+                          : []),
+                        ...(import.meta.env.DEV
+                          ? [
+                              ...(templateEntries.length > 0 ? [{ _isDivider: true }] : []),
+                              { slug: "__devPrintThermal__", label: "DEV: Print thermal (item UPC)" },
+                              { slug: "__devPrintCustom__", label: "DEV: Print custom UPC..." },
+                            ]
+                          : []),
                       ]}
                       onOpenChange={(open) => { if (open) _setPrintQty(1); }}
-                      onSelect={(item) => handleQuickPrint(item.slug)}
+                      onSelect={(item) => {
+                        if (item.slug === "__devPrintThermal__") handleDevPrintThermal();
+                        else if (item.slug === "__devPrintCustom__") handleDevPrintCustomOpen();
+                        else handleQuickPrint(item.slug);
+                      }}
                       buttonText=""
                       buttonIcon={ICONS.print}
                       buttonIconSize={22}
@@ -675,7 +800,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                         height: 44,
                         padding: 8,
                       }}
-                      aria-label="Print label"
+                      aria-label="Print options"
                     />
                   </Tooltip>
                   {sPrintSuccess && (
@@ -695,7 +820,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   )}
                 </PrintActionSlot>
               ),
-              (isNew && !!sItem.catalogName?.trim()) && (
+              (isNew && !isCatalogImport && !!sItem.catalogName?.trim()) && (
                 <LargeModalHeaderButton
                   key="saveNew"
                   variant="accent"
@@ -706,7 +831,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   Save
                 </LargeModalHeaderButton>
               ),
-              (!isNew && sDirty) && (
+              (!isDraft && sDirty) && (
                 <LargeModalHeaderButton
                   key="saveEdit"
                   variant="accent"
@@ -722,6 +847,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                 variant="default"
                 icon={ICONS.close1}
                 iconPosition="only"
+                iconSize={27}
                 tooltip="Close"
                 onClick={handleExit}
               />,
@@ -731,9 +857,38 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
 
           <div className={styles.scrollBody}>
             <div className={styles.scrollBodyInner}>
+            {isCatalogImport && (() => {
+              const vendor = VENDOR_CATALOGS.find((v) => v.id === sItem.vendorId);
+              const importLabel = vendor?.displayName
+                ? `IMPORT ITEM FROM ${vendor.displayName.toUpperCase()}`
+                : "IMPORT ITEM";
+              return (
+              <div style={{ marginBottom: 10, display: "flex", justifyContent: "center" }}>
+                <Button
+                  text={importLabel}
+                  icon={ICONS.add}
+                  iconSize={22}
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  onPress={handleSaveNewItem}
+                  enabled={!!sItem.catalogName?.trim()}
+                  buttonStyle={{
+                    width: "100%",
+                    height: 52,
+                    borderRadius: Radius.control,
+                  }}
+                  textStyle={{
+                    color: C.text,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                  }}
+                />
+              </div>
+              );
+            })()}
             {/* Names */}
             <div className={styles.sectionCard} style={sectionCardInline}>
-              {renderField("Catalog Name", "catalogName", { autoFocus: true })}
+              {renderField("Catalog Name", "catalogName", { autoFocus: true, multiline: true })}
               {/* {renderField("Quick Button/Descriptive Name", "informalName", { multiline: true, hint: " -- use enter key to space name to fit quick button card if desired" })} */}
             </div>
 
@@ -768,6 +923,55 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               </div>
             </div>
 
+            {/* Vendor Specs */}
+            {sItem.category !== "Labor" && Object.keys(sItem.specs || {}).length > 0 && (
+              <div className={styles.sectionCard} style={sectionCardInline}>
+                <button
+                  type="button"
+                  className={styles.specsToggle}
+                  onClick={() => _setShowSpecs((v) => !v)}
+                  aria-expanded={sShowSpecs}
+                >
+                  <span
+                    className={styles.specsToggleChevron}
+                    style={{
+                      color: C.textMuted,
+                      transform: sShowSpecs ? "rotate(90deg)" : "rotate(0deg)",
+                    }}
+                  >
+                    ▶
+                  </span>
+                  <span className={styles.specsToggleLabel} style={{ color: C.text }}>
+                    FULL PRODUCT SPECS
+                  </span>
+                  <span className={styles.specsToggleCount} style={{ color: C.textMuted }}>
+                    ({Object.keys(sItem.specs).length})
+                  </span>
+                </button>
+                {sShowSpecs && (
+                  <div className={styles.specsWrap}>
+                    {Object.entries(sItem.specs).map(([label, value]) => (
+                      <div
+                        key={label}
+                        className={styles.specChip}
+                        style={{
+                          backgroundColor: C.surfaceBase,
+                          border: `1px solid ${C.borderSubtle}`,
+                        }}
+                      >
+                        <span className={styles.specChipLabel} style={{ color: C.textMuted }}>
+                          {label}
+                        </span>
+                        <span className={styles.specChipValue} style={{ color: C.text }}>
+                          {String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Prices */}
             <div className={`${styles.sectionCard} ${styles.sectionCardRowPrices}`} style={sectionCardInline}>
               {sItem.category === "Labor" && (
@@ -779,6 +983,26 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               {renderField("Sale Price", "salePrice", { currency: true, flex: 1, last: sItem.category === "Labor" })}
               {sItem.category !== "Labor" && renderField("Cost", "cost", { currency: true, flex: 1 })}
               {sItem.category !== "Labor" && renderField("MSRP", "msrp", { currency: true, flex: 1, last: true })}
+              {sItem.category !== "Labor" && (() => {
+                const price = Number(sItem.price) || 0;
+                const cost = Number(sItem.cost) || 0;
+                const marginPct = price > 0 ? ((price - cost) / price) * 100 : null;
+                const display = marginPct == null ? "-" : `${marginPct.toFixed(1)}%`;
+                const valueColor =
+                  marginPct == null
+                    ? C.text
+                    : marginPct >= 30
+                      ? C.green
+                      : marginPct >= 10
+                        ? C.text
+                        : C.danger || C.red;
+                return (
+                  <div className={styles.marginWrap}>
+                    <span className={styles.marginLabel} style={{ color: C.textMuted }}>Margin</span>
+                    <span className={styles.marginValue} style={{ color: valueColor }}>{display}</span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Barcodes */}
@@ -846,7 +1070,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                 )}
               </div>
               <div className={styles.barcodesCol}>
-                {renderField("Vendor ID", "vendorId", { last: true })}
+                {renderField("Vendor Part ID", "vendorPartId", { last: true })}
               </div>
             </div>
 
@@ -1034,6 +1258,77 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
             onClose={() => _setShowQBPicker(false)}
           />
         </Suspense>
+      )}
+      {import.meta.env.DEV && sShowDevCustomEntry && (
+        <Dialog
+          visible={sShowDevCustomEntry}
+          onClose={handleDevPrintCustomClose}
+          title="DEV: Print custom UPC"
+          aria-label="DEV: Print custom UPC"
+        >
+          <div
+            style={{
+              width: 380,
+              backgroundColor: C.surfaceRaised,
+              borderRadius: Radius.row,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div style={{ padding: "16px 20px 8px", display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>DEV: Print custom UPC</div>
+              <div style={{ fontSize: 12, color: C.textMuted }}>
+                Spoofs a workorder with the entered barcode and sends it to the thermal printer.
+              </div>
+            </div>
+            <div style={{ padding: "8px 20px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+              <label style={{ fontSize: 12, color: C.textMuted }}>Barcode (12 or 13 digits)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoFocus
+                maxLength={13}
+                value={sDevCustomBarcode}
+                onChange={(e) => {
+                  _setDevCustomBarcode(e.target.value.replace(/[^0-9]/g, ""));
+                  if (sDevCustomError) _setDevCustomError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleDevPrintCustomConfirm();
+                  else if (e.key === "Escape") handleDevPrintCustomClose();
+                }}
+                placeholder="e.g. 012345678905"
+                style={{
+                  fontSize: 18,
+                  letterSpacing: 1,
+                  padding: "10px 12px",
+                  border: `1px solid ${C.borderSubtle}`,
+                  borderRadius: Radius.control,
+                  backgroundColor: C.surfaceBase,
+                  color: C.text,
+                  outline: "none",
+                }}
+              />
+              <div style={{ minHeight: 16, fontSize: 12, color: C.danger }}>
+                {sDevCustomError}
+              </div>
+            </div>
+            <ModalFooter size="small">
+              <ModalFooterButton variant="danger" onClick={handleDevPrintCustomClose}>
+                Cancel
+              </ModalFooterButton>
+              <ModalFooterButton
+                variant="accent"
+                icon={ICONS.print}
+                onClick={handleDevPrintCustomConfirm}
+              >
+                Print
+              </ModalFooterButton>
+            </ModalFooter>
+          </div>
+        </Dialog>
       )}
     </>
   );

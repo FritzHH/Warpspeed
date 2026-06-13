@@ -1,0 +1,23 @@
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  z-index: 1000; /* z-allow: panel-scoped jump blocker; sits in Info_ActiveWorkorder's local stacking context above autocomplete dropdowns (z-index 999) */
+}
+
+.card {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  border-radius: var(--radius-container);
+  padding: 28px 44px;
+  min-width: 240px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 500;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}

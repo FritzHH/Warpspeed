@@ -42,7 +42,10 @@ class BaselineStore {
       console.log(`[baseline:${this.vendor}] no baseline at gs://${this.bucketName}/${this.fileName} - bootstrap run`);
       return new Map();
     }
-    const [buffer] = await this.file.download();
+    // decompress: false - we save with Content-Encoding: gzip metadata, which
+    // makes the GCS SDK auto-decompress on download by default. Our save path
+    // uploads raw gzip bytes, so we need raw bytes back to gunzip ourselves.
+    const [buffer] = await this.file.download({ decompress: false });
     const decompressed = await gunzipP(buffer);
     const obj = JSON.parse(decompressed.toString("utf8"));
     const map = new Map(Object.entries(obj));

@@ -120,7 +120,7 @@ function formatPaymentMethod(transactionIDs, txnsById) {
 export const TodaysHistoryComponent = () => {
   const zSalesTaxPercent = useSettingsStore((state) => state.settings?.salesTaxPercent) || 0;
   const [sEvents, _setEvents] = useState([]);
-  const [sFilter, _setFilter] = useState("all");
+  const [sFilter, _setFilter] = useState("salesAndWorkorders");
   const [sTxnsById, _setTxnsById] = useState({});
   const [sSalesById, _setSalesById] = useState({});
   const [sWosById, _setWosById] = useState({});
@@ -204,12 +204,12 @@ export const TodaysHistoryComponent = () => {
   }
 
   const FILTERS = [
-    { id: "all", label: "All" },
-    { id: "sale", label: "Sales" },
-    { id: "completed", label: "Workorders" },
+    { id: "salesAndWorkorders", label: "Sales & Workorders" },
     { id: "deleted", label: "Deleted Workorders" },
   ];
-  const filteredEvents = sFilter === "all" ? sEvents : sEvents.filter((e) => e.type === sFilter);
+  const filteredEvents = sFilter === "salesAndWorkorders"
+    ? sEvents.filter((e) => e.type === "sale" || e.type === "completed")
+    : sEvents.filter((e) => e.type === sFilter);
 
   return (
     <div className={styles.root}>

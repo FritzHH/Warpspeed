@@ -36,18 +36,23 @@
 .countBadge {
   background-color: var(--info);
   border-radius: var(--radius-row);
+  min-width: 20px;
+  height: 20px;
   padding-left: 6px;
   padding-right: 6px;
-  padding-top: 1px;
-  padding-bottom: 1px;
   margin-left: 6px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .countBadgeText {
   color: var(--text-on-accent);
   font-size: 13px;
   font-weight: 600;
+  line-height: 1;
 }
 
 .headerActions {
@@ -61,6 +66,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
+  gap: 4px;
   background-color: var(--danger);
   border-radius: var(--radius-control);
   padding-left: 12px;
@@ -75,6 +81,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
+  gap: 4px;
   background-color: var(--info);
   border-radius: var(--radius-control);
   padding-left: 12px;
@@ -183,7 +190,7 @@
   color: var(--text-muted);
 }
 
-.viewer {
+.carousel {
   position: fixed;
   top: 0;
   left: 0;
@@ -191,44 +198,92 @@
   bottom: 0;
   background-color: var(--surface-overlay-heavy);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   z-index: 100;
-  cursor: pointer;
 }
 
-.viewerCloseBtn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 2;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-container);
-  background-color: rgba(255, 255, 255, 0.2);
+.deleteBtn {
+  background-color: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
-.viewerCloseBtnText {
-  color: var(--text-on-accent);
-  font-size: 20px;
-  font-weight: 700;
+.carouselTrack {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  min-height: 0;
 }
 
-.viewerMedia {
-  width: 95%;
-  max-height: 85%;
+.carouselSlide {
+  flex: 0 0 100%;
+  width: 100%;
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carouselMedia {
+  max-width: 95%;
+  max-height: 95%;
   object-fit: contain;
 }
 
-.viewerFilename {
-  color: var(--text-secondary);
-  font-size: 12px;
-  margin-top: 8px;
+.bottomOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  padding: 20px 24px;
+  z-index: 2;
+}
+
+.carouselCloseBtn {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dotsRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--surface-overlay-medium);
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--accent);
+  background-color: transparent;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.dotActive {
+  background-color: var(--accent);
 }
 
 .recorderWrap {

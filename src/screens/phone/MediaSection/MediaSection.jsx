@@ -1,80 +1,51 @@
-import { useState, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useOpenWorkordersStore, useUploadProgressStore } from "../../../stores";
-import { compressImage } from "../../../utils";
-import { dbUploadWorkorderMedia } from "../../../db_calls_wrapper";
-import { SmallLoadingIndicator } from "../../../dom_components";
-import { VideoRecorder } from "../VideoRecorder/VideoRecorder";
-import { C } from "../../../styles";
+import { dbDeleteWorkorderMedia } from "../../../db_calls_wrapper";
+import { Image, PanelConfirm, SmallLoadingIndicator } from "../../../dom_components";
+import { C, ICONS } from "../../../styles";
 import styles from "./MediaSection.module.css";
 
-export function MediaSection({ workorder, zSettings }) {
-  const [sViewMedia, _setViewMedia] = useState(null);
-  const [sShowRecorder, _setShowRecorder] = useState(false);
-  const uploadInputRef = useRef(null);
+export function MediaSection({ workorder }) {
+  const navigate = useNavigate();
+  const [sCarouselOpen, _setCarouselOpen] = useState(false);
+  const [sCurrentIdx, _setCurrentIdx] = useState(0);
+  const [sConfirmDelete, _setConfirmDelete] = useState(false);
+  const initialIdxRef = useRef(0);
   const zUploadProgress = useUploadProgressStore((s) => s.progress);
 
   const media = workorder.media || [];
 
-  function handleUploadPress() {
-    if (uploadInputRef.current) uploadInputRef.current.click();
+  function openCarousel(idx) {
+    initialIdxRef.current = idx;
+    _setCurrentIdx(idx);
+    _setCarouselOpen(true);
   }
 
-  function handleFileChange(e) {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    if (uploadInputRef.current) uploadInputRef.current.value = "";
-    doUpload(files);
-  }
-
-  async function doUpload(files) {
-    const total = files.length;
-    let completed = 0;
-    let failed = 0;
-    useUploadProgressStore.getState().setProgress({ completed: 0, total, failed: 0, done: false });
-    const newMedia = [...(workorder?.media || [])];
-    const storeName = (zSettings?.storeInfo?.displayName || "photo").replace(/\s+/g, "_");
-    for (let i = 0; i < files.length; i++) {
-      let fileToUpload = files[i];
-      const originalFilename = fileToUpload.name;
-      const originalFileSize = fileToUpload.size;
-      const ext = fileToUpload.name.split(".").pop() || "jpg";
-      const rand = Math.floor(1000 + Math.random() * 9000);
-      const typeLabel = fileToUpload.type.startsWith("video") ? "Video" : "Image";
-      const cleanName = `${storeName}_${typeLabel}_${rand}.${ext}`;
-      if (fileToUpload.type.startsWith("image")) {
-        const compressed = await compressImage(fileToUpload, 1024, 0.65);
-        if (compressed) {
-          compressed.name = cleanName;
-          fileToUpload = compressed;
-        } else {
-          fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
-        }
-      } else {
-        fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
-      }
-      const result = await dbUploadWorkorderMedia(workorder.id, fileToUpload, {
-        originalFilename,
-        originalFileSize,
-      });
-      if (result.success) {
-        newMedia.push(result.mediaItem);
-        completed++;
-      } else {
-        failed++;
-      }
-      useUploadProgressStore.getState().setProgress({ completed, total, failed, done: false });
+  const carouselScrollRef = useCallback((el) => {
+    if (el) {
+      el.scrollLeft = initialIdxRef.current * el.clientWidth;
     }
-    useOpenWorkordersStore.getState().setField("media", newMedia, workorder.id);
-    useUploadProgressStore.getState().setProgress({ completed, total, failed, done: true });
-    setTimeout(
-      () => useUploadProgressStore.getState().setProgress(null),
-      failed > 0 ? 5000 : 3000
-    );
+  }, []);
+
+  function handleCarouselScroll(e) {
+    const el = e.target;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    if (idx !== sCurrentIdx) _setCurrentIdx(idx);
   }
 
-  function handleRecordingComplete(file) {
-    _setShowRecorder(false);
-    doUpload([file]);
+  function handleDeleteCurrent() {
+    const item = media[sCurrentIdx];
+    if (!item) return;
+    const newMedia = media.filter((_, i) => i !== sCurrentIdx);
+    useOpenWorkordersStore.getState().setField("media", newMedia, workorder.id);
+    dbDeleteWorkorderMedia(item);
+    _setConfirmDelete(false);
+    if (newMedia.length === 0) {
+      _setCarouselOpen(false);
+    } else if (sCurrentIdx >= newMedia.length) {
+      _setCurrentIdx(newMedia.length - 1);
+    }
   }
 
   const progressPct = zUploadProgress
@@ -84,15 +55,6 @@ export function MediaSection({ workorder, zSettings }) {
   return (
     <>
       <div className={styles.card}>
-        <input
-          ref={uploadInputRef}
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          onChange={handleFileChange}
-          className={styles.hiddenInput}
-        />
-
         <div className={styles.headerRow}>
           <div className={styles.headerLeft}>
             <span className={styles.label}>MEDIA</span>
@@ -105,13 +67,19 @@ export function MediaSection({ workorder, zSettings }) {
           <div className={styles.headerActions}>
             <button
               type="button"
-              onClick={() => _setShowRecorder(true)}
+              onClick={() => navigate(`/phone/workorder/${workorder.id}/video`)}
               className={styles.recordBtn}
             >
-              <span className={styles.actionBtnText}>Record</span>
+              <Image icon={ICONS.add} size={16} />
+              <span className={styles.actionBtnText}>Video</span>
             </button>
-            <button type="button" onClick={handleUploadPress} className={styles.addBtn}>
-              <span className={styles.actionBtnText}>+ Add</span>
+            <button
+              type="button"
+              onClick={() => navigate(`/phone/workorder/${workorder.id}/photo`)}
+              className={styles.addBtn}
+            >
+              <Image icon={ICONS.add} size={16} />
+              <span className={styles.actionBtnText}>Picture</span>
             </button>
           </div>
         </div>
@@ -146,13 +114,13 @@ export function MediaSection({ workorder, zSettings }) {
 
         {media.length > 0 ? (
           <div className={styles.thumbGrid}>
-            {media.map((item) => {
+            {media.map((item, idx) => {
               const isVideo = item.type === "video";
               return (
                 <div
                   key={item.id}
                   className={styles.thumb}
-                  onClick={() => _setViewMedia(item)}
+                  onClick={() => openCarousel(idx)}
                 >
                   <img
                     src={item.thumbnailUrl || item.url}
@@ -173,42 +141,64 @@ export function MediaSection({ workorder, zSettings }) {
         )}
       </div>
 
-      {sViewMedia && (
-        <div className={styles.viewer} onClick={() => _setViewMedia(null)}>
-          <button
-            type="button"
-            onClick={() => _setViewMedia(null)}
-            className={styles.viewerCloseBtn}
+      {sCarouselOpen && media.length > 0 && (
+        <div className={styles.carousel}>
+          <div
+            className={styles.carouselTrack}
+            ref={carouselScrollRef}
+            onScroll={handleCarouselScroll}
           >
-            <span className={styles.viewerCloseBtnText}>{"\u2715"}</span>
-          </button>
-          {sViewMedia.type === "video" ? (
-            <video
-              src={sViewMedia.url}
-              controls
-              autoPlay
-              className={styles.viewerMedia}
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <img
-              src={sViewMedia.url}
-              alt=""
-              className={styles.viewerMedia}
-              onClick={(e) => e.stopPropagation()}
-            />
-          )}
-          <span className={styles.viewerFilename}>
-            {sViewMedia.originalFilename || sViewMedia.filename || ""}
-          </span>
-        </div>
-      )}
-
-      {sShowRecorder && (
-        <div className={styles.recorderWrap}>
-          <VideoRecorder
-            onComplete={handleRecordingComplete}
-            onCancel={() => _setShowRecorder(false)}
+            {media.map((item) => (
+              <div key={item.id} className={styles.carouselSlide}>
+                {item.type === "video" ? (
+                  <video src={item.url} controls className={styles.carouselMedia} />
+                ) : (
+                  <img src={item.url} alt="" className={styles.carouselMedia} />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className={styles.bottomOverlay}>
+            <button
+              type="button"
+              onClick={() => _setCarouselOpen(false)}
+              className={styles.carouselCloseBtn}
+              aria-label="Close"
+            >
+              <Image icon={ICONS.close1} size={42} />
+            </button>
+            {media.length > 1 && (
+              <div className={styles.dotsRow}>
+                {media.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`${styles.dot} ${idx === sCurrentIdx ? styles.dotActive : ""}`}
+                  />
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => _setConfirmDelete(true)}
+              className={styles.deleteBtn}
+              aria-label="Delete"
+            >
+              <Image icon={ICONS.trash} size={42} />
+            </button>
+          </div>
+          <PanelConfirm
+            show={sConfirmDelete}
+            centered
+            title="Delete media?"
+            message={
+              media[sCurrentIdx]?.type === "video"
+                ? "This video will be permanently removed."
+                : "This picture will be permanently removed."
+            }
+            yesText="Delete"
+            noText="Cancel"
+            onYes={handleDeleteCurrent}
+            onNo={() => _setConfirmDelete(false)}
           />
         </div>
       )}

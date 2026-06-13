@@ -1,3 +1,17 @@
+/* ============================================================
+ * AlertBox — modern severity-themed alert card
+ *
+ * Layout (top-down):
+ *   1. Severity accent strip (4px colored bar)
+ *   2. Header row: severity icon bubble + title
+ *   3. Body: message + optional submessage (indented under title)
+ *   4. ModalFooter button row (footer override = white w/ hairline)
+ *
+ * Severities (locked):
+ *   info     — cool blue accent (default for confirmations / notices)
+ *   warning  — amber/orange accent (destructive or attention-required)
+ * ============================================================ */
+
 .overlay {
   position: fixed;
   top: 0;
@@ -9,6 +23,8 @@
   align-items: center;
   justify-content: center;
   pointer-events: auto;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .content {
@@ -16,42 +32,203 @@
   top: 50%;
   left: 50%;
   /* transform supplied inline — base "translate(-50%, -50%)" plus per-card cascade offset */
-  border-radius: var(--radius-container);
+  border-radius: var(--radius-row);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  width: 25%;
+  width: 28%;
+  min-width: 360px;
   background-color: var(--surface-base);
+  box-shadow:
+    0 24px 60px var(--shadow-color-default),
+    0 6px 16px var(--shadow-color-subtle);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif;
 }
 
-.headerOverride {
-  text-align: center;
+/* ---------- Severity accent strip ---------- */
+
+.accentStrip {
+  flex-shrink: 0;
+  height: 7px;
+  width: 100%;
 }
 
-.body {
+.content.info .accentStrip {
+  background-color: var(--info);
+}
+
+.content.warning .accentStrip {
+  background-color: var(--warning);
+}
+
+/* ---------- Header (icon bubble + title) ---------- */
+
+.header {
+  flex-shrink: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 24px 14px;
+}
+
+.iconBubble {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 20px 20px;
+}
+
+.content.info .iconBubble {
+  background-color: var(--surface-info-muted);
+  color: var(--info-strong);
+}
+
+.content.warning .iconBubble {
+  background-color: var(--surface-warning-muted);
+  color: var(--text-warning);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+/* ---------- Body ---------- */
+
+.body {
+  flex-shrink: 0;
+  /* indent under title text so paragraph aligns with header copy */
+  padding: 2px 24px 22px 82px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Title-less body falls back to centered legacy layout */
+.bodyNoTitle {
+  padding: 28px 24px 24px;
+  align-items: center;
 }
 
 .message {
-  text-align: center;
-  width: 90%;
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--text-default);
   white-space: pre-line;
 }
 
-.subMessage {
-  margin-top: 20px;
-  width: 80%;
+.bodyNoTitle .message {
   text-align: center;
-  font-size: 16px;
+  width: 90%;
+}
+
+.subMessage {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--text-secondary);
+}
+
+.bodyNoTitle .subMessage {
+  text-align: center;
+  width: 85%;
+  font-size: 14px;
+  margin-top: 14px;
+}
+
+/* ---------- Footer override (replaces ModalFooter's gray-200 default) ---------- */
+
+.footerOverride {
+  background-color: var(--surface-base);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ============================================================
+ * Tablet variant — bigger touch targets, scaled type
+ * ============================================================ */
+
+.content.tablet {
+  width: 60%;
+}
+
+.content.tablet .header {
+  padding: 32px 32px 18px;
+  gap: 18px;
+}
+
+.content.tablet .iconBubble {
+  width: 60px;
+  height: 60px;
+}
+
+.content.tablet .title {
+  font-size: 30px;
+}
+
+.content.tablet .body {
+  padding: 4px 32px 30px 110px;
+}
+
+.content.tablet .bodyNoTitle {
+  padding: 44px 28px 28px;
+}
+
+.content.tablet .message {
+  font-size: 24px;
+}
+
+.content.tablet .subMessage {
+  font-size: 19px;
+  margin-top: 16px;
+}
+
+/* ============================================================
+ * Phone variant — near-full-width, generous spacing
+ * ============================================================ */
+
+.content.phone {
+  width: 92%;
+  min-width: 0;
+}
+
+.content.phone .header {
+  padding: 20px 18px 12px;
+  gap: 12px;
+}
+
+.content.phone .iconBubble {
+  width: 40px;
+  height: 40px;
+}
+
+.content.phone .title {
+  font-size: 21px;
+}
+
+.content.phone .body {
+  padding: 2px 18px 20px 70px;
+}
+
+.content.phone .bodyNoTitle {
+  padding: 24px 20px 22px;
+}
+
+.content.phone .message {
+  font-size: 19px;
+  line-height: 1.5;
+}
+
+.content.phone .subMessage {
+  font-size: 15px;
+  margin-top: 10px;
 }

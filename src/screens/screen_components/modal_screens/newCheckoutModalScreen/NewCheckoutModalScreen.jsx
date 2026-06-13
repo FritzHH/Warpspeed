@@ -1170,6 +1170,9 @@ export function NewCheckoutModalScreen() {
     // Transactions were already persisted on capture (persistSale). Just write the completed-sale and delete the active-sale.
     let saleToPersist = prepareSaleForPersist(sale, localTxns, localCreds);
     delete saleToPersist.pendingTransactionIDs;
+    // Stamp completion time over the active-sale's original creation millis, so
+    // SalesReports' date-range query catches the sale on the day it actually closed.
+    saleToPersist.millis = Date.now();
     await writeCompletedSale(saleToPersist);
     await deleteActiveSale(sale.id);
 

@@ -1,0 +1,210 @@
+.container {
+  background-color: var(--surface-raised);
+  border-radius: var(--radius-row);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  margin-top: 10px;
+  display: block;
+}
+
+.fieldLabel:first-child {
+  margin-top: 0;
+}
+
+.totalsBlock {
+  background-color: var(--surface-base);
+  border-color: var(--border-subtle);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.totalsRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.totalsLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.totalsValue {
+  font-size: 14px;
+  color: var(--text-default);
+}
+
+.totalsLabelBold {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.totalsValueBold {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-default);
+}
+
+.totalsDivider {
+  height: 1px;
+  background-color: var(--border-subtle);
+  margin: 8px 0;
+}
+
+.textInput {
+  width: 100%;
+  height: 38px;
+  border-color: var(--border-subtle);
+  border-width: 1px;
+  border-style: solid;
+  padding-left: 10px;
+  padding-right: 10px;
+  outline: none;
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  box-sizing: border-box;
+  background-color: var(--surface-base);
+}
+
+.stripeField {
+  height: 38px;
+  border-color: var(--border-subtle);
+  border-width: 1px;
+  border-style: solid;
+  border-radius: var(--radius-control);
+  padding: 10px 10px;
+  box-sizing: border-box;
+  background-color: var(--surface-base);
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+}
+
+.colHalf {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.colGap {
+  width: 10px;
+  flex-shrink: 0;
+}
+
+.errorText {
+  font-size: 13px;
+  color: var(--danger);
+  margin-top: 10px;
+  display: block;
+}
+
+.btnRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.cancelBtn {
+  flex: 0 0 auto;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+  background-color: var(--surface-alt);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-subtle);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.cancelBtnText {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.chargeBtn {
+  flex: 1;
+  height: 44px;
+  border-radius: var(--radius-control);
+  background-color: var(--accent);
+  border: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chargeBtnDisabled {
+  opacity: 0.4;
+}
+
+.chargeBtnText {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-on-accent);
+}
+
+.successPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 12px;
+}
+
+.successHeader {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.successAmount {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-default);
+}
+
+.receiptSentText {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent);
+  margin-top: 12px;
+  text-align: center;
+  word-break: break-word;
+}
+
+.receiptNoneText {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 12px;
+  text-align: center;
+}
